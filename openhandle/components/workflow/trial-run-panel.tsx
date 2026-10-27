@@ -18,6 +18,19 @@ export function TrialRunHistory({ runs, selectedId, onSelect, onEdit, onDelete, 
   onEdit: (id: string, change: { note?: string; kept?: boolean }) => void;
   onDelete: (id: string) => void; storageError?: string;
 }) {
+  const tableScroll = useRef<HTMLDivElement>(null);
+  const [scrollEdges, setScrollEdges] = useState({ top: false, bottom: false });
+  useEffect(() => {
+    const element = tableScroll.current;
+    if (!element) return;
+    const update = () => setScrollEdges({ top: element.scrollTop > 1, bottom: element.scrollTop + element.clientHeight < element.scrollHeight - 1 });
+    update();
+    element.addEventListener("scroll", update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => { element.removeEventListener("scroll", update); observer.disconnect(); };
+  }, [runs.length]);
   const [editing, setEditing] = useState<HistoryEntry | null>(null);
   const [note, setNote] = useState("");
   const [deleting, setDeleting] = useState<HistoryEntry | null>(null);
@@ -26,13 +39,13 @@ export function TrialRunHistory({ runs, selectedId, onSelect, onEdit, onDelete, 
   return <section className="p2-trial-history" aria-label="历史试跑记录">
     <div className="p2-history-heading"><h3>历史试跑</h3><span>{runs.length} / {TRIAL_LIMIT} 条 · 当前草稿</span></div>
     {runs.length >= TRIAL_LIMIT && <p className="p2-callout warning" role="status">历史试跑已满 {TRIAL_LIMIT} 条，删除记录后才能继续试跑。</p>}
-    {runs.length ? <div className="p2-history-table-scroll"><table><thead><tr><th>轮次 / 时间</th><th>草稿快照</th><th>输入样本</th><th>备注</th><th>状态</th><th>留存</th><th>操作</th></tr></thead><tbody>{runs.map((item) => <tr key={item.id} aria-current={item.id === selectedId ? "true" : undefined}>
+    {runs.length ? <div ref={tableScroll} className="p2-history-table-scroll" data-fade-top={scrollEdges.top} data-fade-bottom={scrollEdges.bottom} tabIndex={0} aria-label="上下滚动试跑历史表格"><table><thead><tr><th>轮次 / 时间</th><th>草稿快照</th><th>输入样本</th><th>备注</th><th>状态</th><th>留存</th><th>操作</th></tr></thead><tbody>{runs.map((item) => <tr key={item.id} aria-current={item.id === selectedId ? "true" : undefined}>
       <td>第 {round(item)} 次<small>{new Date(item.createdAt).toLocaleString("zh-CN", { hour12: false })}</small></td><td>{item.revision}</td><td>{item.sample.name}</td>
       <td className="p2-history-note"><span>{item.note || "未添加备注"}</span><button aria-label={`编辑第 ${round(item)} 次试跑备注`} disabled={item.phase === "running"} onClick={() => { setEditing(item); setNote(item.note ?? ""); }}><Pencil size={14} /></button></td>
       <td>{item.phase === "running" ? "运行中" : item.phase === "passed" ? "已完成" : "未完成"}</td><td>{item.kept ? <strong>已保留</strong> : <><span>到期清除</span><small>{new Date(item.createdAt + TRIAL_LIFETIME).toLocaleString("zh-CN", { hour12: false })}</small></>}</td>
       <td><div className="p2-history-actions"><button aria-label={`查看第 ${round(item)} 次试跑结果`} onClick={() => onSelect(item.id)}>查看结果</button><button aria-label={`${item.kept ? "取消保留" : "保留"}第 ${round(item)} 次试跑`} disabled={item.phase === "running"} onClick={() => item.kept && item.createdAt + TRIAL_LIFETIME <= Date.now() ? setUnkeeping(item) : onEdit(item.id, { kept: !item.kept })}>{item.kept ? "取消保留" : "保留"}</button><button aria-label={`删除第 ${round(item)} 次试跑`} disabled={item.kept || item.phase === "running"} title={item.kept ? "取消保留后才能删除" : item.phase === "running" ? "运行结束后可删除" : undefined} onClick={() => setDeleting(item)}>删除</button></div></td>
     </tr>)}</tbody></table></div> : <p className="p2-sample-empty">还没有试跑记录。选择资源后开始第一轮试跑。</p>}
-    <p className="p2-history-scope">未保留记录自启动起 7 天到期；保留后长期留存并锁定，取消保留后才能删除。所有记录共用 {TRIAL_LIMIT} 个名额，不自动覆盖。</p><p className="p2-history-scope">{storageError || "记录和本地样本保存在当前浏览器；打开页面时清理过期记录，不跨设备同步。清除浏览器数据会一并清除历史。"}</p>
+    <p className="p2-history-scope p2-history-retention">未保留记录自启动起 7 天到期；保留后长期留存并锁定，取消保留后才能删除。所有记录共用 {TRIAL_LIMIT} 个名额，不自动覆盖。</p>{storageError && <p className="p2-history-storage-error" role="alert">{storageError}</p>}
     <Dialog open={Boolean(editing)} onOpenChange={(open) => { if (!open) setEditing(null); }}><DialogContent><DialogTitle>第 {editing && round(editing)} 次试跑备注</DialogTitle><DialogDescription>说明这轮试跑的用途，方便之后查找。</DialogDescription><form className="p2-history-form" onSubmit={(event) => { event.preventDefault(); if (editing) onEdit(editing.id, { note: note.trim() }); setEditing(null); }}><label htmlFor="trial-note">备注</label><textarea id="trial-note" value={note} maxLength={200} rows={4} onChange={(event) => setNote(event.target.value)} /><small>{note.length} / 200</small><footer><Button type="button" variant="outline" onClick={() => setEditing(null)}>取消</Button><Button type="submit">保存备注</Button></footer></form></DialogContent></Dialog>
     <Dialog open={Boolean(unkeeping)} onOpenChange={(open) => { if (!open) setUnkeeping(null); }}><DialogContent><DialogTitle>取消保留第 {unkeeping && round(unkeeping)} 次试跑？</DialogTitle><DialogDescription>本轮已超过启动后的 7 天期限，取消保留将立即清除记录，无法恢复。</DialogDescription><div className="p2-history-dialog-actions"><Button variant="outline" onClick={() => setUnkeeping(null)}>继续保留</Button><Button variant="danger" onClick={() => { if (unkeeping) onEdit(unkeeping.id, { kept: false }); setUnkeeping(null); }}>取消保留并清除</Button></div></DialogContent></Dialog>
     <Dialog open={Boolean(deleting)} onOpenChange={(open) => { if (!open) setDeleting(null); }}><DialogContent><DialogTitle>删除第 {deleting && round(deleting)} 次试跑？</DialogTitle><DialogDescription>本轮样本、配置快照和输入输出将一并清除，无法恢复。当前草稿与其他轮次不受影响。</DialogDescription><div className="p2-history-dialog-actions"><Button variant="outline" onClick={() => setDeleting(null)}>取消</Button><Button variant="danger" onClick={() => { if (deleting) onDelete(deleting.id); setDeleting(null); }}>确认删除</Button></div></DialogContent></Dialog>

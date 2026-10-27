@@ -31,8 +31,7 @@ function EditorInner() {
       }
       if (event.data?.type === 'hawk:split-publish-error') setSplit(current => current && current.requestId === event.data.requestId ? { ...current, error: String(event.data.message) } : current);
       if (event.data?.type === 'hawk:back') {
-        const projectId = draftProjectId(readWorkspace(), draft);
-        router.push(projectId !== undefined ? `/hawk/project/detail/${projectId}?tab=executors` : '/hawk/pipeline');
+        router.push('/hawk/pipeline');
       }
       if (event.data?.type === 'hawk:published') {
         router.push(typeof event.data.executorId === 'string' ? '/hawk/pipeline/executor?id=' + encodeURIComponent(event.data.executorId) : '/hawk/pipeline');

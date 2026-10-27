@@ -361,3 +361,14 @@
 /* Platform entrances deliberately use the current resource platform placeholder. */
 .p2-resource-paths>button{display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:1px solid #dde4ed;border-radius:8px;background:#fff;text-align:left;color:#3b4654;font:inherit}.p2-resource-paths>button:hover{border-color:#168bff;background:#f6faff}.p2-resource-paths>button>span{display:flex;flex-direction:column;gap:4px;flex:1}.p2-resource-paths>button strong{font-size:13px}.p2-resource-paths>button small{font-size:11px}.p2-platform-placeholder-description{margin-top:16px!important;color:#697586!important}.p2-platform-placeholder{min-height:240px;background:#fff}
 .p2-upload-state{display:flex;align-items:center;gap:8px;color:#1677ff!important;padding:10px 0}.p2-upload-ready{display:flex!important;align-items:center;flex-wrap:wrap;gap:4px;color:#389e0d!important}.p2-upload-ready code{overflow-wrap:anywhere;white-space:normal}.p2-selected-sample>div{min-width:0}.p2-platform-handoff{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:26px 12px;color:#1677ff;background:#f7faff;border:1px solid #e6f0ff;border-radius:8px}.p2-platform-handoff small{font-size:12px;color:#8a94a6}.p2-resource-picker:has(.p2-platform-handoff) .p2-platform-placeholder{min-height:16px}
+
+.p2-trial-output-summary{margin-bottom:16px!important}
+.p2-resizable-dock>.p2-history-content{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.p2-history-content>.p2-trial-history{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.p2-trial-history>.p2-history-heading,.p2-trial-history>.p2-callout,.p2-trial-history>.p2-history-retention,.p2-trial-history>.p2-history-storage-error{flex:none}
+.p2-trial-history>.p2-history-table-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;--fade-top:0px;--fade-bottom:0px;mask-image:linear-gradient(to bottom,transparent,#000 var(--fade-top),#000 calc(100% - var(--fade-bottom)),transparent)}
+.p2-history-table-scroll[data-fade-top="true"]{--fade-top:16px}
+.p2-history-table-scroll[data-fade-bottom="true"]{--fade-bottom:20px}
+.p2-history-table-scroll thead{position:sticky;top:0;z-index:1}
+.p2-trial-history>.p2-history-retention{margin-top:auto;padding-top:14px;line-height:1.6}
+.p2-history-storage-error{font-size:12px;color:#c53030;padding-top:8px}
