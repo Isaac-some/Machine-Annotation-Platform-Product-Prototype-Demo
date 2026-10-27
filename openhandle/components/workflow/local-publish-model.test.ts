@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createNode, getOperator } from '@/app/lib/workflow';
-import { declaredOutputs, extractSegment, publicationSegments } from './local-publish-model';
+import { declaredOutputs, extractSegment, nextGraphVersion, publicationSegments } from './local-publish-model';
 
 describe('local publication boundaries', () => {
+  it('allocates the next whole-graph version independently of each internal flow version', () => {
+    expect(nextGraphVersion([1, 2, 4])).toBe(5);
+    expect(nextGraphVersion([])).toBe(1);
+  });
   it('derives actual TOS boundaries with arbitrary IDs and dependency order for repeated splits', () => {
     const first = createNode(getOperator('demo.tos.list')!, 'actual-directory', { x: 0, y: 0 });
     const next = createNode(getOperator('demo.tos.list')!, 'another-directory', { x: 100, y: 0 });

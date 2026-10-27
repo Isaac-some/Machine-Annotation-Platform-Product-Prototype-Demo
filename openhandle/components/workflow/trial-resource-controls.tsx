@@ -6,7 +6,7 @@ import { trialCidSample, type TrialResource } from './trial-resource';
 import type { TrialSample } from './trial-run';
 export function TrialCidInput({ resources, onChange, onNotice }: { resources: TrialResource[]; onChange: (sample: TrialSample) => void; onNotice: (message: string) => void }) {
   const [cid, setCid] = useState('');
-  return <div className="p2-trial-cid-input"><label htmlFor="trial-input-cid">使用上一组产出 CID</label><div><Input id="trial-input-cid" aria-label="试跑输入 CID" placeholder="粘贴 CID://..." value={cid} onChange={event => setCid(event.target.value)} /><Button variant="outline" onClick={() => { try { onChange(trialCidSample(cid, resources)); onNotice('已使用该 CID 的固定产出作为本组输入，请执行整组试跑'); } catch (error) { onNotice(error instanceof Error ? error.message : 'CID 不可用'); } }}>使用 CID</Button></div><small>当前原型使用本机演示 CID，不连接真实资源平台。</small></div>;
+  return <div className="p2-trial-cid-input"><label htmlFor="trial-input-cid">粘贴 CID</label><div><Input id="trial-input-cid" aria-label="试跑输入 CID" placeholder="粘贴 CID://..." value={cid} onChange={event => setCid(event.target.value)} /><Button variant="outline" onClick={() => { try { onChange(trialCidSample(cid, resources)); onNotice('已使用该 CID 的固定产出作为本组输入，请执行整组试跑'); } catch (error) { onNotice(error instanceof Error ? error.message : 'CID 不可用'); } }}>使用 CID</Button></div><small>可粘贴适用来源的 CID；当前原型使用本机演示 CID，不连接真实资源平台。</small></div>;
 }
 export function TrialResourceActions({ resource, onNotice }: { resource?: TrialResource; onNotice: (message: string) => void }) {
   if (!resource) return null;

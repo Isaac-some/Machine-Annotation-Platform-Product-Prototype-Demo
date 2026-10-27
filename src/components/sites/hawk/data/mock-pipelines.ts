@@ -6,6 +6,8 @@ export interface PipelineDraft {
   id: string;
   name: string;
   status: "published" | "draft";
+  catalogueOnline?: boolean;
+  internalGroup?: boolean;
   description: string | null;
   outputs: string[];
   version?: number;

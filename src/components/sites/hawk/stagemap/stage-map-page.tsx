@@ -65,11 +65,11 @@ export function StageMapPage() {
   const graphStore = useMemo(() => createGraphStore(flows.map(flow => flow.graphKey ?? 'annotation-demo.graph.' + flow.id)), [flows]);
   const graphSnapshot = useSyncExternalStore(graphStore.subscribe, graphStore.snapshot, () => '[]');
   const savedGraphs = useMemo(() => { try { return (JSON.parse(graphSnapshot) as (string | null)[]).map(raw => { try { return JSON.parse(raw ?? "null") as Graph | null; } catch { return null; } }); } catch { return []; } }, [graphSnapshot]);
-  const flowOnline = (flow: PipelineDraft) => flow.status === "published" && mapStore.flowAvailability[flow.id] !== false;
+  const flowOnline = (flow: PipelineDraft) => flow.status === "published" && flow.catalogueOnline !== false && mapStore.flowAvailability[flow.id] !== false;
   const referenceIndex = useMemo(() => {
     const index = new globalThis.Map<string, typeof flows>();
     flows.forEach((flow, row) => {
-      if (flow.status !== 'published' || mapStore.flowAvailability[flow.id] === false) return;
+      if (flow.status !== 'published' || flow.catalogueOnline === false || mapStore.flowAvailability[flow.id] === false) return;
       const codes = new Set(savedGraphs[row]?.nodes?.map(node => node.data?.operatorId ?? node.data?.op).filter((code): code is string => Boolean(code)));
       codes.forEach(code => index.set(code, [...(index.get(code) ?? []), flow]));
     });
@@ -81,7 +81,7 @@ export function StageMapPage() {
     const domainMatch = domain === "全部算子" || op.tags.includes(domain) || (domain === "AI 打标与模型" && op.tags.includes("模型调用")) || (domain === "表格与字段处理" && op.tags.includes("字段处理"));
     return text.includes(keyword.trim().toLowerCase()) && domainMatch && (status === "all" || op.online === (status === "online")) && (!offlineOnly || (op.online && references(op).length === 0));
   });
-  const filteredFlows = flows.filter((flow, index) => [flow.name, flow.id, flow.description ?? "", flow.project, ...(savedGraphs[index]?.nodes?.filter(isProcess).map(node => node.data?.label ?? node.data?.operatorId) ?? [])].join(" ").toLowerCase().includes(keyword.trim().toLowerCase()) && (status === "all" || flowOnline(flow) === (status === "online")) && (!offlineOnly || flowOnline(flow)));
+  const filteredFlows = flows.filter((flow, index) => !flow.internalGroup && flow.catalogueOnline !== false && [flow.name, flow.id, flow.description ?? "", flow.project, ...(savedGraphs[index]?.nodes?.filter(isProcess).map(node => node.data?.label ?? node.data?.operatorId) ?? [])].join(" ").toLowerCase().includes(keyword.trim().toLowerCase()) && (status === "all" || flowOnline(flow) === (status === "online")) && (!offlineOnly || flowOnline(flow)));
   const selectedOp = filteredOperators.find(op => String(op.id) === selectedId) ?? filteredOperators[0];
   const selectedFlow = filteredFlows.find(flow => flow.id === selectedId) ?? filteredFlows[0];
   const activeFlow = flowMode ? selectedFlow : undefined;

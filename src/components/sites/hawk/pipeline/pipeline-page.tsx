@@ -25,14 +25,17 @@ import { ExecutorComposer, type ExecutorDraft } from "./executor-composer";
 import { saveExecutor, writeWorkspace, useWorkspace } from '../data/local-workspace';
 import { groupProjectId } from '../data/workspace-projects';
 
-function DraftCard({ draft, onDeleted, onEditDesc }: {
+function DraftCard({ draft, onDeleted, onEditDesc, onListed }: {
   draft: PipelineDraft;
   onDeleted: (id: string) => void;
   onEditDesc: (id: string, description: string) => void;
+  onListed: (id: string, catalogue: { name: string; description: string; type: string; domain: string }) => void;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [description, setDescription] = useState("");
+  const [listingOpen, setListingOpen] = useState(false);
+  const [listingForm] = Form.useForm();
   const editFinished = useRef(false);
   const [modal, modalContext] = Modal.useModal();
   const finishEdit = (cancel = false) => {
@@ -50,6 +53,7 @@ function DraftCard({ draft, onDeleted, onEditDesc }: {
           <Tag color={draft.status === "published" ? "green" : "default"}>{draft.status === "published" ? "已发布" : "草稿"}</Tag>
         </div>
         <Space size={8} className="hawk-pipeline-card-actions">
+          {draft.status === "published" && !draft.internalGroup && draft.catalogueOnline === false && <Button size="small" onClick={() => { listingForm.setFieldsValue({ name: draft.name, description: draft.description ?? "" }); setListingOpen(true); }}>正式上架</Button>}
           <Button type="primary" size="small" onClick={() => router.push("/hawk/pipeline/editor?draft=" + encodeURIComponent(draft.id))}>打开草稿</Button>
           <Button danger size="small" aria-label={"删除 " + draft.name} icon={<DeleteOutlined />} onClick={() => modal.confirm({
             title: "删除「" + draft.name + "」？",
@@ -75,6 +79,14 @@ function DraftCard({ draft, onDeleted, onEditDesc }: {
         <span className="hawk-pipeline-output-label">输出</span>
         <span className="hawk-pipeline-output-values" title={draft.outputs.join(" · ")}>{draft.outputs.join(" · ") || "-"}</span>
       </div></div>
+      <Modal title="正式上架通用能力" open={listingOpen} okText="确认上架" cancelText="取消" onCancel={() => setListingOpen(false)} onOk={() => listingForm.submit()}>
+        <Form form={listingForm} layout="vertical" onFinish={values => { onListed(draft.id, values); setListingOpen(false); }}>
+          <Form.Item name="name" label="能力名称" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
+          <Form.Item name="description" label="简介" rules={[{ required: true, whitespace: true }]}><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="type" label="类型" rules={[{ required: true, whitespace: true }]}><Input placeholder="例如：工作流" /></Form.Item>
+          <Form.Item name="domain" label="领域" rules={[{ required: true, whitespace: true }]}><Input placeholder="例如：视频处理" /></Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
@@ -140,6 +152,11 @@ export function PipelinePage() {
     msg.success("描述已更新");
   };
 
+  const listFlow = (id: string, catalogue: { name: string; description: string; type: string; domain: string }) => {
+    writeWorkspace({ ...workspace, groups: baseGroups.map(group => ({ ...group, drafts: group.drafts.map(draft => draft.id === id ? { ...draft, catalogueOnline: true, catalogue } : draft) })) });
+    msg.success("已正式上架到通用能力目录");
+  };
+
   return (
     <div className="hawk-pipeline-page">
       {contextHolder}
@@ -181,7 +198,7 @@ export function PipelinePage() {
           children: (
             <div className="hawk-pipeline-card-list">
               {g.drafts.map((d) => (
-                <DraftCard key={d.id} draft={d} onDeleted={(id) => writeWorkspace({ ...workspace, groups: baseGroups.map(group => ({ ...group, drafts: group.drafts.filter(draft => draft.id !== id) })) })} onEditDesc={editDesc} />
+                <DraftCard key={d.id} draft={d} onDeleted={(id) => writeWorkspace({ ...workspace, groups: baseGroups.map(group => ({ ...group, drafts: group.drafts.filter(draft => draft.id !== id) })) })} onEditDesc={editDesc} onListed={listFlow} />
               ))}
             </div>
           ),

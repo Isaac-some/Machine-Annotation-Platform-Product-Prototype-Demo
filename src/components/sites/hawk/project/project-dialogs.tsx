@@ -40,8 +40,10 @@ export function BatchCreateDialog({ open, projectId, source, onClose, onCreated 
   const [form] = Form.useForm(); const [msg, holder] = message.useMessage(); const [dictionary, setDictionary] = useState(false);
   const mode = Form.useWatch("uploadMode", form) ?? "上传 CSV"; const inheritInput = Form.useWatch("inheritInput", form);
   const batches = readWorkspace().batches.filter(row => row.projectId === projectId);
-  const published = readWorkspace().groups.flatMap(group => group.drafts.filter(flow => flow.status === "published").map(flow => flow.name));
-  const workflows = Array.from(new Set([...WORKFLOW_OPTIONS, ...published]));
+  const published = readWorkspace().groups.flatMap(group => group.drafts.filter(flow => flow.status === "published" && !flow.internalGroup));
+  const general = published.filter(flow => flow.catalogueOnline !== false).map(flow => flow.name);
+  const temporary = published.filter(flow => flow.catalogueOnline === false).map(flow => flow.name).filter(name => !general.includes(name));
+  const workflows = Array.from(new Set([...WORKFLOW_OPTIONS, ...general, ...temporary]));
   return <><Modal title={source ? "克隆批次" : "创建批次"} className="hawk-batch-dialog" open={open} width={720} onCancel={onClose} okText={source ? "克隆批次" : "创建批次"} cancelText="取 消" destroyOnHidden onOk={async () => {
     let values; try { values = await form.validateFields(); } catch { return; }
     const resource = source && values.inheritInput ? source.inputResource : values.uploadMode === "继承批次结果" ? "BATCH://" + values.inheritBatch : values.uploadMode === "导入圈选 ID" ? "CID://" + String(values.cid).replace(/^CID:\/\//i, "") : values.uploadMode === "填写主键生成 CSV" ? "local://rowkeys-" + Date.now() + ".csv" : values.resource;

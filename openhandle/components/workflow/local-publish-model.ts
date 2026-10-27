@@ -4,6 +4,7 @@ import { workflowOutputFields } from './workflow-outputs';
 
 export type LocalGraph = { nodes: Node<WorkflowNodeData>[]; edges: Edge[]; revision?: number };
 export const isSplitOperator = (node: Node<WorkflowNodeData>) => getOperator(node.data.operatorId)?.behavior === 'fanout';
+export function nextGraphVersion(versions: number[]): number { return Math.max(0, ...versions.filter(Number.isInteger)) + 1; }
 
 function orderedGraphNodes(graph: LocalGraph) {
   const remaining = [...graph.nodes];

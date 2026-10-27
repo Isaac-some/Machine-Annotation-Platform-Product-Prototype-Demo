@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { declaredOutputs, extractSegment, type LocalGraph } from './local-publish-model';
+import { declaredOutputs, extractSegment, nextGraphVersion, type LocalGraph } from './local-publish-model';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
-type Flow = { id: string; name: string; description: string | null; status: 'published' | 'draft'; outputs: string[]; version?: number; publishedId?: string; graphKey?: string };
+type Flow = { id: string; name: string; description: string | null; status: 'published' | 'draft'; catalogueOnline?: boolean; internalGroup?: boolean; catalogue?: { name: string; description: string; type: string; domain: string }; outputs: string[]; version?: number; publishedId?: string; graphKey?: string };
 type Group = { project: string; projectId?: number; drafts: Flow[] };
 type Workspace = { groups: Group[]; projects: { id: number; name: string }[]; executors: Record<string, unknown>[] };
 const key = 'annotation-demo.local-workspace.v1';
@@ -21,12 +21,14 @@ export function LocalPublish({ draftId, title, segments, purpose, onClose, onPub
     if (submitted.current) return;
     const publishName = publication?.name ?? name;
     const publishParts = publication ? parts.map((part, index) => ({ ...part, ...publication.parts[index] })) : parts;
-    if (!publishName.trim() || publishParts.some(part => !part.name.trim()) || (!segments && publishParts.some(part => !part.description.trim()))) { setError('请补全名称和简介'); return; }
+    if ((segments && !publishName.trim()) || publishParts.some(part => !part.name.trim())) { setError('请补全执行器名称和工作流名称'); return; }
     try {
       const workspace = JSON.parse(localStorage.getItem(key) ?? 'null') as Workspace | null;
       if (!workspace?.groups) throw new Error('请从工作流列表打开编辑器后再发布');
       const stamp = Date.now();
-      const flows: Flow[] = publishParts.map((part, index) => ({ id: segments ? `${draftId}-part-${stamp}-${index}` : draftId, name: segments ? part.name.trim() : publishName.trim(), description: part.description.trim(), status: 'published', outputs: [] }));
+      const versionPrefix = `annotation-demo.published.${draftId}.v`;
+      const rootVersion = nextGraphVersion(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).flatMap(key => key?.startsWith(versionPrefix) ? [Number(key.slice(versionPrefix.length))] : []));
+      const flows: Flow[] = publishParts.map((part, index) => ({ id: segments ? `${draftId}-part-${stamp}-${index}` : draftId, name: segments ? part.name.trim() : (publishName.trim() || title || draftId), description: part.description.trim() || null, status: 'published', catalogueOnline: false, internalGroup: Boolean(segments), outputs: [] }));
       const group = workspace.groups.find(item => item.drafts.some(flow => flow.id === draftId));
       if (!group) throw new Error('没有可发布到的项目');
       const projects = workspace.projects.filter(project => group.projectId === undefined ? project.name === group.project : project.id === group.projectId);
@@ -35,7 +37,7 @@ export function LocalPublish({ draftId, title, segments, purpose, onClose, onPub
       if (projectId !== undefined) group.projectId = projectId;
       flows.forEach(flow => {
         const previous = group.drafts.find(item => item.id === flow.id);
-        flow.version = (previous?.version ?? (previous?.status === 'published' ? 1 : 0)) + 1;
+        flow.version = segments ? rootVersion : (previous?.version ?? (previous?.status === 'published' ? 1 : 0)) + 1;
         flow.publishedId = `${flow.id.startsWith('flow.') ? flow.id.replace(/@\d+$/, '') : 'flow.' + flow.id}@${flow.version}`;
         flow.graphKey = `annotation-demo.published.${flow.id}.v${flow.version}`;
       });
@@ -44,7 +46,8 @@ export function LocalPublish({ draftId, title, segments, purpose, onClose, onPub
       if (!graph) throw new Error('请先保存草稿再发布');
       const nextGraphs = publishParts.map(part => segments ? extractSegment(graph, part.nodeIds) : graph);
       flows.forEach((flow, index) => { flow.outputs = declaredOutputs(nextGraphs[index]); });
-      const previous = flows.flatMap(flow => ['annotation-demo.graph.' + flow.id, flow.graphKey!].map(key => ({ key, value: localStorage.getItem(key) })));
+      const rootSnapshotKey = `${versionPrefix}${rootVersion}`;
+      const previous = [...flows.flatMap(flow => ['annotation-demo.graph.' + flow.id, flow.graphKey!].map(key => ({ key, value: localStorage.getItem(key) }))), ...(segments ? [{ key: rootSnapshotKey, value: localStorage.getItem(rootSnapshotKey) }] : [])];
       const executorId = segments ? `executor-${stamp}` : undefined;
       if (executorId) workspace.executors.unshift({ id: executorId, projectId, purpose, sourceDraftId: draftId, name: publishName.trim(), description: publishParts.map(part => part.description).filter(Boolean).join('；'), source: 'canvas', flowIds: flows.map(flow => flow.id), flows, updatedAt: new Date().toISOString() });
       try {
@@ -52,6 +55,7 @@ export function LocalPublish({ draftId, title, segments, purpose, onClose, onPub
           localStorage.setItem('annotation-demo.graph.' + flow.id, JSON.stringify(nextGraphs[index]));
           localStorage.setItem(flow.graphKey!, JSON.stringify(nextGraphs[index]));
         });
+        if (segments) localStorage.setItem(rootSnapshotKey, JSON.stringify({ ...graph, groupFlowIds: flows.map(flow => flow.publishedId) }));
         localStorage.setItem(key, JSON.stringify(workspace));
       } catch (failure) {
         previous.forEach(item => { if (item.value === null) localStorage.removeItem(item.key); else localStorage.setItem(item.key, item.value); });
@@ -82,8 +86,8 @@ export function LocalPublish({ draftId, title, segments, purpose, onClose, onPub
   if (embedded) return null;
   return <div className="p2-local-publish">
     {segments && <div className="p2-callout warning"><strong>单工作流发布已阻断</strong><p>遍历 TOS 目录会产生多条后续输入，本案例需拆成 {parts.length} 条工作流。顺序来自当前画布，不能在此重新排序。</p><Button variant="outline" size="sm" onClick={onLocateBoundary}>定位阻断节点</Button></div>}
-    <label>{segments ? '执行器名称' : '工作流名称'}<Input aria-label={segments ? '执行器名称' : '工作流名称'} value={name} onChange={event => setName(event.target.value)} /></label>
-    {parts.map((part, index) => <section key={index}><h3>{segments ? `${index + 1}. 工作流` : '发布内容'}</h3>{segments && <><p>{part.labels.join(' → ')}</p><label>工作流名称<Input aria-label={`第${index + 1}段名称`} value={part.name} onChange={event => setParts(parts.map((item, row) => row === index ? { ...item, name: event.target.value } : item))} /></label></>}<label>简介<Textarea aria-label={segments ? `第${index + 1}段简介` : '工作流简介'} rows={2} value={part.description} onChange={event => setParts(parts.map((item, row) => row === index ? { ...item, description: event.target.value } : item))} /></label></section>)}
+    {segments && <label>执行器名称<Input aria-label="执行器名称" value={name} onChange={event => setName(event.target.value)} /></label>}
+    {segments && parts.map((part, index) => <section key={index}><h3>{index + 1}. 工作流</h3><p>{part.labels.join(' → ')}</p><label>工作流名称<Input aria-label={`第${index + 1}段名称`} value={part.name} onChange={event => setParts(parts.map((item, row) => row === index ? { ...item, name: event.target.value } : item))} /></label><label>简介（选填）<Textarea aria-label={`第${index + 1}段简介`} rows={2} value={part.description} onChange={event => setParts(parts.map((item, row) => row === index ? { ...item, description: event.target.value } : item))} /></label></section>)}
     {error && <p className="p2-error" role="alert">{error}</p>}
     <footer><Button variant="outline" onClick={onClose}>返回编排</Button><Button onClick={() => publish()}>{segments ? '发布工作流并创建执行器' : '确认发布'}</Button></footer>
   </div>;
