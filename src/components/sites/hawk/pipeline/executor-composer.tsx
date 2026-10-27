@@ -129,7 +129,7 @@ function ExecutorComposerDialog({
               dataSource={available.slice(0, 50)}
               locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有可添加的工作流" /> }}
               renderItem={(flow) => (
-                <List.Item actions={[<Button key="add" type="link" icon={<PlusOutlined />} onClick={() => add(flow.id)}>添加</Button>]}> 
+                <List.Item actions={[<Button key="add" type="link" icon={<PlusOutlined />} onClick={() => add(flow.id)}>添加</Button>]}>
                   <List.Item.Meta title={<span>{flow.name} <Typography.Text type="secondary" style={{ fontSize: 12, overflowWrap: 'anywhere' }}>({publishedFlowId(flow)})</Typography.Text></span>} description={flow.description || '暂无描述'} />
                 </List.Item>
               )}
