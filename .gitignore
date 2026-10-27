@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+openhandle/pages-dist/
+public/sites/hawk/openhandle/
+*.tsbuildinfo
+next-env.d.ts
+.env*
+.DS_Store
+.blurt/
+docs/research/
+verification/

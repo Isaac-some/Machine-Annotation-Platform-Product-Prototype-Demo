@@ -1,0 +1,4318 @@
+[
+  {
+    "id": "demo.ai-platform.deepseek",
+    "name": "调用deepseek系列模型",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling"
+    ],
+    "capabilities": [
+      "ai_platform",
+      "llm",
+      "multimodal"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_model_sync",
+    "inputs": [
+      {
+        "key": "urls",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.http_list",
+        "cardinality": "many",
+        "producers": [
+          "demo.tos.sign"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "系统提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "类型(text / image / video / audio)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "自动展开",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "视频标注每秒抽帧数",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "视频标注最大帧数",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "使用字段作为提示词",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "字段名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "单一性(尽可能多次输入结果一致)",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "超时时间(秒)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "deepseek_output",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ai-platform.gemini",
+    "name": "调用gemini系列模型",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "video",
+      "image"
+    ],
+    "capabilities": [
+      "gemini",
+      "llm",
+      "video"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_model_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "自动展开",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "gemini_output",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ai-platform.qwen",
+    "name": "获取标题和关键词信息",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "image"
+    ],
+    "capabilities": [
+      "image_caption",
+      "llm",
+      "qwen"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_model_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "is_internal_model",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "keywords",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "title",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "source",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ai-platform.qwen_tmp1",
+    "name": "调用qwen系列模型",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling"
+    ],
+    "capabilities": [
+      "llm",
+      "multimodal",
+      "qwen"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_model_sync",
+    "inputs": [],
+    "config": [
+      {
+        "key": "模型",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "type:select;selections:qwen3.5-flash,qwen3.5-plus;default:qwen3.5-flash"
+      },
+      {
+        "key": "类型",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "type:select;selections:text,image,video,audio;default:image"
+      },
+      {
+        "key": "提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "系统提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "输入字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "输出字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "抽帧数",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "type:select;selections:1,2,3,4,5,6,7,8,9,10;default:1;advanced"
+      },
+      {
+        "key": "最大帧数",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "advanced"
+      },
+      {
+        "key": "提示词字段名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "advanced"
+      },
+      {
+        "key": "单一性",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "hints:尽可能多次输入结果一致;advanced"
+      },
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "advanced;default:64;max:10000"
+      },
+      {
+        "key": "超时时间",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "hints:单位秒;advanced;default:1200"
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ai-platform.seedream.img2img",
+    "name": "调用seedream系列模型(图生图)",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "image"
+    ],
+    "capabilities": [
+      "image_generation",
+      "seedream",
+      "tos"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_model_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "提示词",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "自动展开",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "seedream_output",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.quality.aesthetic",
+    "name": "视频美学评分（演示）",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "validation",
+      "video"
+    ],
+    "capabilities": [
+      "aesthetic",
+      "filter",
+      "video"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "最低分数",
+        "type": "Float",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "是否开启",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "average_ap_score",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.quality.image_score",
+    "name": "图片质量评分（演示）",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "image"
+    ],
+    "capabilities": [
+      "image_score",
+      "quality_model",
+      "image"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "image_score",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.quality.video_score",
+    "name": "视频质量评分（演示）",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "video"
+    ],
+    "capabilities": [
+      "iqa",
+      "quality",
+      "video"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "score",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.quality.background",
+    "name": "纯色背景分类（演示）",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "image"
+    ],
+    "capabilities": [
+      "background",
+      "quality_model",
+      "image"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "scbg_score",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "background_type",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.quality.watermark",
+    "name": "水印识别（演示）",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "video"
+    ],
+    "capabilities": [
+      "qwen3vl",
+      "video",
+      "watermark"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload",
+          "demo.vod.local_split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "subtitle_status",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "manipulate",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "logo",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.csv.expand",
+    "name": "CSV展开",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "csv",
+      "split",
+      "transform"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "<待展开字段值>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "待展开字段",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "展开后字段",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "分隔符",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "<展开后字段值>",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "dynamic"
+      },
+      {
+        "key": "split_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.csv.merge",
+    "name": "CSV合并",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "csv",
+      "merge",
+      "tos"
+    ],
+    "behavior": "aggregate",
+    "cardinality": "N:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_dir",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "one",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "merge_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.csv.unique",
+    "name": "CSV去重",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "csv",
+      "dedup",
+      "tos"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "历史key存储地址",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "去重字段",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "排除批次(batch_id多个用逗号分隔)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "保存到历史key存储地址",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "去重后文件存储地址",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "unique_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.eval.filter",
+    "name": "过滤表达式计算",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "validation"
+    ],
+    "capabilities": [
+      "expr",
+      "filter",
+      "validation"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "<比较字段值>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "比较字段",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "操作符号(> < >= <= =)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "比较值",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.exif.get",
+    "name": "获取图片meta信息",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "image",
+      "metadata"
+    ],
+    "capabilities": [
+      "exif",
+      "image",
+      "metadata"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "输出字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "elem_type:select;elem_selections:width,height,exposure_program,exposure_time,f_number,focal_length,flash,metering_mode,white_balance,color_space,lens,make,model,gps_latitude,gps_longitude,gps_altitude,datetime_original,content_creator,dpi,exposure_compensation,iso,layout"
+      }
+    ],
+    "outputs": [
+      {
+        "key": "width",
+        "type": "String",
+        "semanticType": "media.dimension_px",
+        "cardinality": "one"
+      },
+      {
+        "key": "height",
+        "type": "String",
+        "semanticType": "media.dimension_px",
+        "cardinality": "one"
+      },
+      {
+        "key": "exposure_program",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "exposure_time",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "f_number",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "focal_length",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "flash",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "metering_mode",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "white_balance",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "color_space",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "lens",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "make",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "model",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "gps_latitude",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "gps_longitude",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "gps_altitude",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "datetime_original",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "content_creator",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "dpi",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "exposure_compensation",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "iso",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "layout",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.expr.check",
+    "name": "使用表达式检查",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "validation"
+    ],
+    "capabilities": [
+      "expr",
+      "filter",
+      "validation"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "<输入字段值>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "表达式",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "输入字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "禁用",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ffmpeg.diy",
+    "name": "自定义执行ffmpeg命令",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "ffmpeg",
+      "tos",
+      "video"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "<原始文件tos路径值>",
+        "type": "File",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "原始文件tos路径键名",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "目标文件tos路径键名",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "参数",
+        "type": "List",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "是否使用内存缓存",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "<目标文件tos路径值>",
+        "type": "File",
+        "semanticType": "field.generic",
+        "cardinality": "dynamic"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.ffmpeg.diy.list",
+    "name": "自定义执行ffmpeg命令",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "batch",
+      "ffmpeg",
+      "video"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "<原始文件tos路径值>",
+        "type": "List",
+        "required": true,
+        "semanticType": "collection.generic",
+        "cardinality": "many",
+        "producers": [
+          "demo.ai-platform.qwen",
+          "demo.quality.watermark",
+          "demo.exif.get",
+          "demo.vod.audio.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "原始文件tos路径键名",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "目标文件tos路径键名",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "参数",
+        "type": "List",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "是否使用内存缓存",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "<目标文件tos路径值>",
+        "type": "List",
+        "semanticType": "collection.generic",
+        "cardinality": "many"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.hbase.get",
+    "name": "演示字段处理 19",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "hbase"
+    ],
+    "capabilities": [
+      "dataset",
+      "hbase",
+      "read"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "rowkey",
+        "type": "String",
+        "required": true,
+        "semanticType": "record.rowkey",
+        "cardinality": "one",
+        "producers": [
+          "demo.rowkey"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "fields",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "data_type",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "输出字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "<hbase列名(动态)>",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "dynamic"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.hbase.set",
+    "name": "演示字段处理 20",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "hbase"
+    ],
+    "capabilities": [
+      "dataset",
+      "hbase",
+      "write"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "rowkey",
+        "type": "String",
+        "required": true,
+        "semanticType": "record.rowkey",
+        "cardinality": "one",
+        "producers": [
+          "demo.rowkey"
+        ],
+        "system": false
+      },
+      {
+        "key": "<fields中每个字段名>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "fields",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "data_type",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.hbase.set.v2",
+    "name": "演示字段处理 21",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "hbase"
+    ],
+    "capabilities": [
+      "dataset",
+      "hbase",
+      "write"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "rowkey",
+        "type": "String",
+        "required": true,
+        "semanticType": "record.rowkey",
+        "cardinality": "one",
+        "producers": [
+          "demo.rowkey"
+        ],
+        "system": false
+      },
+      {
+        "key": "<fields中每个字段名>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "fields",
+        "type": "List",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "fields_type",
+        "type": "List",
+        "required": true,
+        "defaultValue": "",
+        "constraints": "elem_type:select;elem_selections:string,int,uint,float,bool,enum,list<string>"
+      },
+      {
+        "key": "data_type",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "type:select;selections:图片,视频;default:图片"
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.hdr.filter",
+    "name": "HDR格式过滤",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "validation",
+      "video"
+    ],
+    "capabilities": [
+      "filter",
+      "hdr",
+      "video"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.image.resize",
+    "name": "图片压缩(resize)",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "image"
+    ],
+    "capabilities": [
+      "image",
+      "resize",
+      "tos"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "File",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "类型(1: 等比压缩)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "最大边长",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "超时时间(秒)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "image_resize_tos_path",
+        "type": "File",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.jsonl.agg",
+    "name": "jsonl聚合",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "aggregate",
+      "jsonl",
+      "tos"
+    ],
+    "behavior": "aggregate",
+    "cardinality": "N:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "File",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "field",
+        "type": "String",
+        "required": true,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "output_path",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "agg_tos_path",
+        "type": "File",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.object_storage.transfer",
+    "name": "对象存储间传输",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage"
+    ],
+    "capabilities": [
+      "cloud",
+      "object_storage",
+      "transfer"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_storage_write",
+    "inputs": [
+      {
+        "key": "src_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "dst_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.string.replace_prefix",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "src.ak",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "src.sk",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "src.endpoint",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "src.region",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "dst.ak",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "dst.sk",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "dst.endpoint",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "dst.region",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.rowkey",
+    "name": "根据tos路径生成rowkey",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "hash",
+      "rowkey",
+      "tos"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "File",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "omitempty;min:1;max:128"
+      },
+      {
+        "key": "输入字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "超时时间",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "hints:单位秒;advanced;default:1200"
+      }
+    ],
+    "outputs": [
+      {
+        "key": "rowkey",
+        "type": "String",
+        "semanticType": "record.rowkey",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.string.replace_prefix",
+    "name": "替换前缀并添加字段",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "tabular"
+    ],
+    "capabilities": [
+      "path",
+      "string",
+      "transform"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "src_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "替换前的前缀名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "替换后的前缀名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "前缀匹配不上是否丢弃",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "dst_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.compress.360p",
+    "name": "压缩到360p",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage",
+      "video"
+    ],
+    "capabilities": [
+      "compress",
+      "tos",
+      "video"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "自动重命名",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "360p_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.exist",
+    "name": "检查文件是否存在",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage",
+      "validation"
+    ],
+    "capabilities": [
+      "existence",
+      "tos",
+      "validation"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "<动态输入字段>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.external_sign",
+    "name": "生成第三方TOS签名(直签)",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage",
+      "delivery"
+    ],
+    "capabilities": [
+      "sign",
+      "tos",
+      "url"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "<field值>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "region",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "endpoint",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "AK",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "SK",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "field",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "tos_external_sign_url",
+        "type": "String",
+        "semanticType": "media_locator.http",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.list",
+    "name": "遍历TOS目录，输出指定的后缀、文件名等",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage"
+    ],
+    "capabilities": [
+      "list",
+      "split",
+      "tos"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "dir",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "one",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "允许的文件后缀(例如.mp4),使用,分隔",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "允许的文件名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.sign",
+    "name": "生成TOS签名(cdn)",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage",
+      "delivery"
+    ],
+    "capabilities": [
+      "cdn",
+      "sign",
+      "tos"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "<Fields中各字段值>",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "dynamic",
+        "producers": [
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.blackborder.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "字段(英文逗号分割多个字段名)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "过期时间(秒)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "域名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "别名",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "tos_sign_urls",
+        "type": "String",
+        "semanticType": "media_locator.http_list",
+        "cardinality": "many"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.unzip",
+    "name": "解压tos的压缩包",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage"
+    ],
+    "capabilities": [
+      "archive",
+      "tos",
+      "unzip"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "最大并发处理数",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "unzip_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.tos.validate",
+    "name": "检查文件格式",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage",
+      "validation"
+    ],
+    "capabilities": [
+      "file_type",
+      "tos",
+      "validation"
+    ],
+    "behavior": "validate_or_filter",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "macro_events_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "mouse_move_by_macro_events_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "mouse_move_to_macro_events_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "system_info_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "video_km_frames_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "fps_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "pc_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.video_cls.url",
+    "name": "经过vid得到分类结果",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "ai-labeling",
+      "video"
+    ],
+    "capabilities": [
+      "classification",
+      "quality_model",
+      "video"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "url",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.http",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod_workflow",
+          "demo.tos.external_sign",
+          "demo.vod.audio.asr.submit",
+          "demo.vod.transcoding.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "lr_label_top",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "zs_label_top",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod_workflow",
+    "name": "经过vid工作流得到视频下载链接",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "storage"
+    ],
+    "capabilities": [
+      "url",
+      "vod",
+      "workflow"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "sync",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload",
+          "demo.vod.local_split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "work_flow_id",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "definitions",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "url",
+        "type": "String",
+        "semanticType": "media_locator.http",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.audio.asr.query",
+    "name": "ASR转写查询",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "audio",
+      "ai-labeling"
+    ],
+    "capabilities": [
+      "asr",
+      "audio",
+      "vod"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "async_poll",
+    "inputs": [
+      {
+        "key": "asr_task_id",
+        "type": "String",
+        "required": true,
+        "semanticType": "task.id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.audio.asr.submit",
+          "demo.vod.transcoding.start"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "asr",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.audio.asr.submit",
+    "name": "ASR转写提交",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "audio",
+      "ai-labeling"
+    ],
+    "capabilities": [
+      "asr",
+      "audio",
+      "vod"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "async_submit",
+    "inputs": [
+      {
+        "key": "audio_tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.list",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.upload.tos",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "asr_task_id",
+        "type": "String",
+        "semanticType": "task.id",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_url",
+        "type": "String",
+        "semanticType": "media_locator.http",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.audio.get",
+    "name": "音频信息获取",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "audio",
+      "metadata",
+      "video"
+    ],
+    "capabilities": [
+      "audio",
+      "ffprobe",
+      "metadata"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "输出字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "elem_type:select;elem_selections:audio_format,audio_codec_name,audio_codec_long_name,audio_channels,audio_channel_layout,audio_duration,audio_bit_rate,audio_sample_rate,audio_bit_depth"
+      },
+      {
+        "key": "自动重命名",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "audio_codec_name",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_codec_long_name",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_channels",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_channel_layout",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_duration",
+        "type": "String",
+        "semanticType": "media.duration",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_bit_rate",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "audio_sample_rate",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.crop.blackborder.crop",
+    "name": "通过黑边剪裁参数进行黑边剪裁",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "black_border",
+      "crop",
+      "video"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "black_border_crop",
+        "type": "String",
+        "required": true,
+        "semanticType": "field.generic",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.crop.blackborder.get",
+          "demo.ai-platform.deepseek",
+          "demo.ai-platform.gemini",
+          "demo.ai-platform.qwen",
+          "demo.ai-platform.seedream.img2img",
+          "demo.quality.aesthetic",
+          "demo.quality.image_score",
+          "demo.quality.video_score",
+          "demo.quality.background",
+          "demo.quality.watermark",
+          "demo.csv.expand",
+          "demo.exif.get",
+          "demo.ffmpeg.diy",
+          "demo.hbase.get",
+          "demo.video_cls.url",
+          "demo.vod.audio.asr.query",
+          "demo.vod.audio.get",
+          "demo.vod.crop.scene.detect_and_split",
+          "demo.vod.frame.extract",
+          "demo.vod.split",
+          "demo.vod.video.get"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "命令执行超时时间(分钟)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "black_border_cropped_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.crop.blackborder.get",
+    "name": "获取黑边的剪裁参数",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "black_border",
+      "detect",
+      "video"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "black_border_crop",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.crop.scene.detect_and_split",
+    "name": "检测视频场景并切分视频",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "scene_detect",
+      "split",
+      "video"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "sync_fanout",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "自动切分(true:开启/false:关闭)",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "过滤最小场景时长(秒) 0:不进行过滤",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "跳过视频开头多少秒进行场景检测 0:不进行跳过",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "忽略视频结尾多少秒进行场景检测 0:不进行忽略",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "scene_split_paths",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "many"
+      },
+      {
+        "key": "scene_split_count",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "scene_count",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.frame.extract",
+    "name": "视频抽帧",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "ffmpeg",
+      "frame_extract",
+      "video"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "策略",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "值",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "输出格式",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "超时时间(秒)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ";advanced;default:64;max:512"
+      },
+      {
+        "key": "阶段QPS",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "omitempty;advanced;max:128"
+      }
+    ],
+    "outputs": [
+      {
+        "key": "extract_frame_count",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "extract_frame_tos_paths",
+        "type": "String",
+        "semanticType": "media_locator.tos_list",
+        "cardinality": "many"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.local_split",
+    "name": "获取vod视频进行本地切分",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "split",
+      "video",
+      "vod"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "切割时长",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "min:10;max:400;default:30"
+      },
+      {
+        "key": "使用内存工作目录",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "split_vid",
+        "type": "String",
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.local_split.tos",
+    "name": "获取tos视频进行本地切分",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "split",
+      "tos",
+      "video"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      },
+      {
+        "key": "rowkey",
+        "type": "String",
+        "required": true,
+        "semanticType": "record.rowkey",
+        "cardinality": "one",
+        "producers": [
+          "demo.rowkey"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "切割时长",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "min:10;max:400;default:30"
+      },
+      {
+        "key": "使用内存工作目录",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.split",
+    "name": "视频分割",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "ffmpeg",
+      "split",
+      "video"
+    ],
+    "behavior": "fanout",
+    "cardinality": "1:N",
+    "executionPattern": "sync_fanout",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "编码模式",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "片段时长(秒)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "超时时间(分钟)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "阶段并发",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "omitempty;advanced;default:16"
+      },
+      {
+        "key": "使用内存加速",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "分割类型",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "split_segment_count",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "split_segment_tos_paths",
+        "type": "String",
+        "semanticType": "media_locator.tos_list",
+        "cardinality": "many"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.transcoding.get",
+    "name": "获取预览视频",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "delivery"
+    ],
+    "capabilities": [
+      "transcoding",
+      "url",
+      "vod"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload",
+          "demo.vod.local_split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "清晰度(选填240p/360p/480p/720p)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "preview_url",
+        "type": "String",
+        "semanticType": "media_locator.http",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.transcoding.query",
+    "name": "vod视频转码查询是否成功",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "delivery"
+    ],
+    "capabilities": [
+      "query",
+      "transcoding",
+      "vod"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "async_poll_once",
+    "inputs": [
+      {
+        "key": "runid",
+        "type": "String",
+        "required": true,
+        "semanticType": "task.id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.transcoding.start",
+          "demo.vod.audio.asr.submit"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.transcoding.query.v2",
+    "name": "vod视频转码查询是否成功，阻塞直到完成或超时",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "delivery"
+    ],
+    "capabilities": [
+      "transcoding",
+      "vod",
+      "wait"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "async_wait_until_done",
+    "inputs": [
+      {
+        "key": "runid",
+        "type": "String",
+        "required": true,
+        "semanticType": "task.id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.transcoding.start",
+          "demo.vod.audio.asr.submit"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "超时实际单位秒",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.transcoding.start",
+    "name": "vod视频触发转码",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "delivery"
+    ],
+    "capabilities": [
+      "start",
+      "transcoding",
+      "vod"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "async_submit",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload",
+          "demo.vod.local_split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "清晰度(选填240p/360p/480p/720p)",
+        "type": "String",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      },
+      {
+        "key": "阶段QPS",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "min:10;max:200;default:100"
+      }
+    ],
+    "outputs": [
+      {
+        "key": "runid",
+        "type": "String",
+        "semanticType": "task.id",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.upload",
+    "name": "tos视频上传vod",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "storage"
+    ],
+    "capabilities": [
+      "tos",
+      "upload",
+      "vod"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "自动重命名",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.upload.tos",
+    "name": "vod视频传到tos",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "storage"
+    ],
+    "capabilities": [
+      "download",
+      "tos",
+      "vod"
+    ],
+    "behavior": "transform_or_write",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "vid",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.vod_id",
+        "cardinality": "one",
+        "producers": [
+          "demo.vod.local_split.tos",
+          "demo.vod.upload",
+          "demo.vod.local_split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [],
+    "outputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.video.get",
+    "name": "视频信息获取",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video",
+      "metadata"
+    ],
+    "capabilities": [
+      "ffprobe",
+      "metadata",
+      "video"
+    ],
+    "behavior": "enrich",
+    "cardinality": "1:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_path",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos",
+        "cardinality": "one",
+        "producers": [
+          "demo.tos.list",
+          "demo.vod.upload.tos",
+          "demo.csv.expand",
+          "demo.csv.merge",
+          "demo.csv.unique",
+          "demo.image.resize",
+          "demo.jsonl.agg",
+          "demo.string.replace_prefix",
+          "demo.tos.compress.360p",
+          "demo.tos.unzip",
+          "demo.vod.crop.blackborder.crop",
+          "demo.vod.video.merge"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "输出字段",
+        "type": "List",
+        "required": false,
+        "defaultValue": "",
+        "constraints": "elem_type:select;elem_selections:duration,height,width,bit_rate,r_frame_rate,avg_frame_rate,fps,pix_fmt,color_range,color_primaries,format,format_name,format_long_name,bits_per_raw_sample,video_codec,size,file_size,layout"
+      },
+      {
+        "key": "自动重命名",
+        "type": "Boolean",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "duration",
+        "type": "String",
+        "semanticType": "media.duration",
+        "cardinality": "one"
+      },
+      {
+        "key": "height",
+        "type": "String",
+        "semanticType": "media.dimension_px",
+        "cardinality": "one"
+      },
+      {
+        "key": "width",
+        "type": "String",
+        "semanticType": "media.dimension_px",
+        "cardinality": "one"
+      },
+      {
+        "key": "bit_rate",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "r_frame_rate",
+        "type": "String",
+        "semanticType": "video.frame_rate",
+        "cardinality": "one"
+      },
+      {
+        "key": "avg_frame_rate",
+        "type": "String",
+        "semanticType": "video.frame_rate",
+        "cardinality": "one"
+      },
+      {
+        "key": "fps",
+        "type": "String",
+        "semanticType": "video.frame_rate",
+        "cardinality": "one"
+      },
+      {
+        "key": "pix_fmt",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "color_range",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "color_primaries",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "format_name",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "format_long_name",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "bits_per_raw_sample",
+        "type": "String",
+        "semanticType": "field.generic",
+        "cardinality": "one"
+      },
+      {
+        "key": "nb_frames",
+        "type": "String",
+        "semanticType": "collection.generic",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  },
+  {
+    "id": "demo.vod.video.merge",
+    "name": "合并多个视频文件",
+    "description": "虚构算子：按演示字段契约展示输入、配置与输出，不连接任何真实服务。",
+    "avoidWhen": "仅供产品交互演示，不能提交生产任务。",
+    "domains": [
+      "video"
+    ],
+    "capabilities": [
+      "ffmpeg",
+      "merge",
+      "video"
+    ],
+    "behavior": "aggregate",
+    "cardinality": "N:1",
+    "executionPattern": "external_service_sync",
+    "inputs": [
+      {
+        "key": "tos_paths",
+        "type": "String",
+        "required": true,
+        "semanticType": "media_locator.tos_list",
+        "cardinality": "many",
+        "producers": [
+          "demo.vod.frame.extract",
+          "demo.vod.split"
+        ],
+        "system": false
+      }
+    ],
+    "config": [
+      {
+        "key": "命令执行超时时间(分钟)",
+        "type": "Int",
+        "required": false,
+        "defaultValue": "",
+        "constraints": ""
+      }
+    ],
+    "outputs": [
+      {
+        "key": "merged_tos_path",
+        "type": "String",
+        "semanticType": "media_locator.tos",
+        "cardinality": "one"
+      }
+    ],
+    "risks": [
+      "模拟定义，不代表实际业务能力或服务指标。"
+    ],
+    "verifiedAt": "2026-01-01",
+    "confidence": "demo"
+  }
+]

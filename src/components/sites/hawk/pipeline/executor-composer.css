@@ -1,0 +1,21 @@
+.hawk-executor-composer .ant-modal-content{display:flex;flex-direction:column;max-height:calc(100dvh - 48px);overflow:hidden}
+.hawk-executor-composer .ant-modal-body{overflow:auto;min-height:0}
+.hawk-executor-composer .ant-modal-footer{flex:none;padding-top:12px;margin-top:14px;border-top:1px solid #f0f0f0}
+.hawk-composer-columns{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:16px}
+.hawk-composer-columns>section{min-width:0}
+.hawk-composer-information{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.hawk-composer-information>label{display:grid;gap:6px;align-content:start;font-size:13px}.hawk-required,.hawk-composer-field-error{color:#ff4d4f}.hawk-composer-field-error{font-size:12px;line-height:18px}.hawk-composer-selected.is-invalid{border-color:#ff4d4f;background:#fffafa}
+.hawk-composer-available,.hawk-composer-selected{padding:14px;border:1px solid #f0f0f0;border-radius:8px;min-height:0;display:flex;flex-direction:column;height:clamp(160px,43dvh,380px)}
+.hawk-composer-selected{background:#f7faff;border-color:#dbeafe}
+.hawk-composer-available>.ant-space{height:100%;min-height:0;display:flex;flex-direction:column;align-items:stretch}
+.hawk-composer-available>.ant-space>.ant-space-item:has(.hawk-composer-candidates){flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
+.hawk-composer-candidates .ant-list-item{align-items:flex-start}.hawk-composer-candidates .ant-list-item-meta{min-width:0}
+.hawk-composer-selection{overflow:auto;overscroll-behavior:contain;min-height:0}
+.hawk-split-composer{display:grid;gap:16px}.hawk-split-composer>label{display:grid;gap:8px;font-size:13px}
+.hawk-split-heading{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.hawk-split-composer ol{list-style:none;padding:0;margin:0;display:grid;gap:10px;max-height:min(340px,45dvh);overflow:auto;overscroll-behavior:contain}
+.hawk-split-composer li{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #dbeafe;border-radius:8px;background:#f7faff}
+.hawk-composer-sequence{display:grid;place-items:center;width:24px;height:24px;flex:none;border-radius:6px;background:#e6f4ff;color:#1677ff;font-weight:600;margin-top:4px}
+.hawk-split-composer li>div{flex:1;min-width:0;display:grid;gap:6px}.hawk-split-composer li .ant-typography{font-size:12px;overflow-wrap:anywhere}
+.hawk-split-composer details{font-size:12px;color:#8c8c8c}.hawk-split-composer summary{cursor:pointer}.hawk-split-composer details textarea{margin-top:6px}
+@media(max-width:680px){.hawk-composer-columns{grid-template-columns:minmax(0,1fr)}.hawk-executor-composer .ant-modal-content{padding:16px}}

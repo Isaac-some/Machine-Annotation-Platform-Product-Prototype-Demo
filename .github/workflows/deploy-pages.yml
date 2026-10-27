@@ -1,0 +1,74 @@
+name: Deploy prototype to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            openhandle/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix openhandle
+      - name: Check public source data
+        run: npm run audit:public
+      - name: Validate application and editor
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+          npm test --prefix openhandle
+          npm run lint --prefix openhandle
+          npx --prefix openhandle tsc --noEmit --project openhandle/tsconfig.json
+      - name: Build static website
+        run: npm run build
+      - name: Check generated website
+        run: npm run audit:public -- --output
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: out
+      - name: Upload downloadable static website
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-static-website
+          path: out
+          include-hidden-files: true
+          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Show online URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: echo "### [打开机器标注平台演示网页]($PAGE_URL)" >> "$GITHUB_STEP_SUMMARY"
