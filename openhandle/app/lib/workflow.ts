@@ -137,6 +137,19 @@ export interface ValidationIssue {
 
 const controlOperators: OperatorDefinition[] = [
   {
+    id: "control.rowkey",
+    name: "生成 rowkey",
+    description: "为展开后的每个文件生成稳定 rowkey，供下游定位每条数据。",
+    domains: ["control"], capabilities: ["rowkey", "identity"], behavior: "transform", cardinality: "1:1", executionPattern: "inline",
+    inputs: [{ key: "tos_path", type: "String", required: true, semanticType: "media_locator.tos", cardinality: "one" }],
+    config: [],
+    outputs: [
+      { key: "rowkey", type: "String", semanticType: "system.rowkey", cardinality: "one" },
+      { key: "tos_path", type: "String", semanticType: "media_locator.tos", cardinality: "one" },
+    ],
+    risks: ["使用当前文件的完整路径作为身份依据；切片不能沿用原视频的 rowkey。"], kind: "control",
+  },
+  {
     id: "control.start",
     name: "启动",
     description: "定义工作流的唯一入口，从这里进入第一条处理线路。",

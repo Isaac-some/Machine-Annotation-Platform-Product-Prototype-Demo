@@ -18,6 +18,18 @@ function graph() {
 const edges = [{ source: "start", target: "transfer" }, { source: "transfer", target: "ai" }, { source: "ai", target: "end" }];
 
 describe("snapshot-bound local trial records", () => {
+  it('generates stable per-file rowkeys and preserves the resource path', () => {
+    const generator = node('key', 'control.rowkey', { mappings: { tos_path: { sourceType: 'parameter' } } });
+    const run = (path: unknown) => simulateTrial([generator], [], { ...sample, values: { tos_path: path, rowkey: 'parent' } }).records.key;
+    const first = run('tos://clips/01.mp4');
+    expect(first.status).toBe('succeeded');
+    expect(first.outputs?.tos_path).toBe('tos://clips/01.mp4');
+    expect(first.outputs?.rowkey).toBe(run('tos://clips/01.mp4').outputs?.rowkey);
+    expect(first.outputs?.rowkey).not.toBe(run('tos://clips/02.mp4').outputs?.rowkey);
+    expect(first.outputs?.rowkey).not.toBe('parent');
+    expect(run(['tos://clips/01.mp4', 'tos://clips/02.mp4']).status).toBe('failed');
+    expect(run('').outputs).toBeUndefined();
+  });
   it("distinguishes real zero and partial output without inventing successful results", () => {
     const run = simulateTrial(graph(), edges, sample, "ai");
     const visible = [run.records.transfer, run.records.ai];

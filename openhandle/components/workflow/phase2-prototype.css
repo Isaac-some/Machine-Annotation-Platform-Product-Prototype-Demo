@@ -27,6 +27,26 @@
 .p2-node.is-flow .p2-node-plus{left:calc(50% + 108px);top:20px}
 .p2-edge-mapping{position:absolute;pointer-events:all;display:inline-flex;align-items:center;gap:4px;padding:4px 7px;border:1px solid #b6d8f5;border-radius:999px;background:#fff;color:#438ac2;box-shadow:0 2px 7px #263b6415;font-size:11px;white-space:nowrap}
 .p2-edge-mapping:hover{border-color:#168fff;background:#f5fbff}
+.p2-edge-handoff{position:absolute;pointer-events:all;display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid #efc57e;border-radius:999px;background:#fffaf1;color:#875a13;box-shadow:0 2px 7px #263b6415;font-size:12px;white-space:nowrap}
+.p2-edge-handoff.configured{border-color:#a6d5bf;background:#f4fcf8;color:#287552}
+.p2-edge-handoff:hover,.p2-edge-handoff:focus-visible{outline:2px solid #168bff;outline-offset:3px}
+.p2-handoff-inspector>header strong{display:flex;align-items:center;gap:7px}
+.p2-handoff-inspector>header small{display:block;margin-top:5px}
+.p2-handoff-inspector .p2-inspector-scroll>section{margin-top:20px;padding-top:16px;border-top:1px solid #e5eaf0}
+.p2-handoff-inspector h3{margin-bottom:10px}
+.p2-handoff-inspector label{display:block;font-size:12px;margin-bottom:5px}
+.p2-handoff-inspector input{margin:6px 0;width:100%;font-size:13px}
+.p2-handoff-inspector p{font-size:12px;line-height:1.7;margin:7px 0}
+.p2-handoff-inspector>footer{flex-wrap:wrap;gap:6px;padding:10px}.p2-handoff-inspector>footer>span{flex:1;min-width:90px}
+.p2-record-choice,.p2-array-selection,.p2-manual-input{margin:12px 0;padding:12px;border:1px solid #dfe6ef;border-radius:6px}
+.p2-record-choice label,.p2-array-selection label{display:block;font-size:12px;margin-bottom:7px}
+.p2-record-choice select,.p2-array-selection select,.p2-manual-row select{display:block;width:100%;min-height:36px;margin-top:6px;border:1px solid #cbd6e3;border-radius:5px;padding:6px;background:white;color:#344252}
+.p2-manual-row{display:grid;grid-template-columns:minmax(90px,1fr) 80px minmax(150px,2fr) 35px;gap:7px;align-items:center;margin:8px 0}
+.p2-manual-row select{margin:0}.p2-manual-row>button{font-size:12px;color:#6d8298}
+.p2-record-actions{display:flex;gap:8px;margin-top:12px}.p2-manual-input>div{margin-top:12px}
+.p2-record-preview,.p2-handoff-snapshot pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;padding:12px;background:#f5f8fb;border-radius:6px;font-size:12px}
+.p2-handoff-snapshot{padding:12px;border:1px solid #dce5ef;border-radius:6px;margin:10px 0;font-size:12px}.p2-handoff-snapshot summary{cursor:pointer;color:#286d9e}.p2-handoff-snapshot p{margin:8px 0;overflow-wrap:anywhere}
+@media(max-width:1000px){.p2-manual-row{grid-template-columns:minmax(100px,1fr) 80px 35px}.p2-manual-row>:nth-child(3){grid-column:1/3;grid-row:2}.p2-manual-row>button{grid-column:3;grid-row:1}}
 .p2-edge-plus{pointer-events:none}
 .p2-edge-plus.selected{pointer-events:all}
 .p2-node-plus{pointer-events:none}
@@ -388,3 +408,6 @@
 .p2-trial-group-list > label:has(input:checked) { background: #eff6ff; border-color: #3b82f6; }
 .p2-trial-group-list > label:has(input:disabled) { opacity: .55; cursor: default; }
 .p2-trial-group-list input { margin-top: 3px; }
+
+
+.p2-handoff-purpose{font-weight:600;color:#253c51}.p2-handoff-inspector select{display:block;width:100%;height:38px;margin:8px 0;border:1px solid #cbd6e3;border-radius:6px;padding:6px 9px;background:white;color:#253c51;font-size:13px}.p2-node.is-handoff-neighbor .p2-node-body{border-color:#168bff;box-shadow:0 0 0 3px #168bff22;opacity:1;filter:none}.p2-node.is-handoff-neighbor .p2-node-label{color:#1465ba}.p2-trial-ignored:has(.is-handoff-neighbor){opacity:1}

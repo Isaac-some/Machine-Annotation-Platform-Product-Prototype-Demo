@@ -4,12 +4,14 @@ import { workflowOutputNodes } from './workflow-outputs';
 
 /** Local demonstration records. No model, storage or execution service is called. */
 export type TrialSample = {
-  id: string; source: "platform" | "local" | "cid"; name: string; type: string; size?: number;
+  id: string; source: "platform" | "local" | "cid" | "manual"; name: string; type: string; size?: number;
   previewUrl: string; values: Record<string, unknown>;
   resource?: { cid: string; sourceRunId: string };
   dataRecord?: boolean;
   upload?: { status: 'ready'; path: string; simulated: true };
+  selections?: { recordIndex?: number; arrayItems?: Record<string, number>; originalArrays?: Record<string, unknown[]> };
 };
+export const trialSampleSourceLabel = (sample: TrialSample) => sample.source === 'platform' ? '平台演示资源' : sample.source === 'cid' ? '试跑产出 CID' : sample.source === 'manual' ? '手动输入' : '本地文件';
 export const platformTrialSamples = [
   { id: "demo_vid_001", name: "视频演示样本.mov", type: "video/quicktime", path: "test-assets/demo.mov" },
   { id: "demo_image_001", name: "图片演示样本.jpg", type: "image/jpeg", path: "test-assets/pexels-amaurymic-33953580.jpg" },
@@ -110,7 +112,12 @@ export function simulateTrial(nodes: TrialNode[], edges: { source: string; targe
         record.config = resolveConfig(node.config, records);
         if (node.id === failureNode) throw new Error("本轮演示返回不符合配置的输出结构");
         if (node.config["跳过"]) throw new Error("本地演示暂不支持跳过算子，请关闭跳过设置后重试");
-        if (node.operatorId === "demo.vod.upload.tos") {
+        if (node.operatorId === 'control.rowkey') {
+          const path = record.inputs.tos_path;
+          if (typeof path !== 'string' || !path.trim()) throw new Error('生成 rowkey 需要一个非空文件路径；多个切片请先明确选择一项');
+          // An injective encoding keeps equal paths stable without hash collisions or random keys.
+          record.outputs = { rowkey: `rk:path:${encodeURIComponent(path)}`, tos_path: path };
+        } else if (node.operatorId === "demo.vod.upload.tos") {
           if (sample.source !== "cid" && !sample.dataRecord && !sample.type.startsWith("video/")) throw new Error("视频转存需要视频资源，请更换所选文件");
           if (typeof record.inputs.vid !== "string") throw new Error("视频转存缺少本轮 vid");
           record.outputs = { tos_path: `tos://demo/${encodeURIComponent(record.inputs.vid)}/${encodeURIComponent(sample.name)}` };

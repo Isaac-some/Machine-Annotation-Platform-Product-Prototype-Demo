@@ -4,8 +4,8 @@ import type { Capability } from './capability-search';
 import { Input } from '@/components/ui/input';
 
 /** Name/ID lookup only. The separate enhanced prototype retains semantic search. */
-export function BasicLibrary({ candidates, onAdd, onClose }: { candidates: Capability[]; onAdd: (candidate: Capability) => void; onClose: () => void }) {
-  const [query, setQuery] = useState('');
+export function BasicLibrary({ candidates, initialQuery = '', onAdd, onClose }: { candidates: Capability[]; initialQuery?: string; onAdd: (candidate: Capability) => void; onClose: () => void }) {
+  const [query, setQuery] = useState(initialQuery);
   const [tab, setTab] = useState<'node' | 'flow'>('node');
   const visible = candidates.filter(item => item.kind === tab && `${item.name} ${item.operatorId ?? item.id}`.toLowerCase().includes(query.trim().toLowerCase()));
   return <aside className="p2-basic-library" aria-label="节点库">
