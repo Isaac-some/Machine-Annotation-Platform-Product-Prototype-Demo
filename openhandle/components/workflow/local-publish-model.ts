@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { workflowOutputFields } from './workflow-outputs';
 
 export type LocalGraph = { nodes: Node<WorkflowNodeData>[]; edges: Edge[]; revision?: number };
+export const isSplitOperator = (node: Node<WorkflowNodeData>) => getOperator(node.data.operatorId)?.behavior === 'fanout';
 
 function orderedGraphNodes(graph: LocalGraph) {
   const remaining = [...graph.nodes];
@@ -21,12 +22,21 @@ export function publicationSegments(graph: LocalGraph): { nodeIds: string[]; lab
   const levels = new Map<string, number>();
   const groups = new Map<number, typeof ordered>();
   for (const node of ordered) {
-    const level = Math.max(0, ...graph.edges.filter(edge => edge.target === node.id).map(edge => (levels.get(edge.source) ?? 0) + (graph.nodes.find(source => source.id === edge.source)?.data.operatorId === 'demo.tos.list' ? 1 : 0)));
+    const level = Math.max(0, ...graph.edges.filter(edge => edge.target === node.id).map(edge => (levels.get(edge.source) ?? 0) + (graph.nodes.some(source => source.id === edge.source && isSplitOperator(source)) ? 1 : 0)));
     levels.set(node.id, level);
     if (node.data.operatorId === 'control.start' || node.data.kind === 'result' || node.data.readOnly) continue;
     groups.set(level, [...(groups.get(level) ?? []), node]);
   }
-  return groups.size > 1 ? [...groups].sort(([left], [right]) => left - right).map(([, nodes]) => ({ nodeIds: nodes.map(node => node.id), labels: nodes.map(node => node.data.label) })) : undefined;
+  return ordered.some(isSplitOperator) && groups.size > 0 ? [...groups].sort(([left], [right]) => left - right).map(([, nodes]) => ({ nodeIds: nodes.map(node => node.id), labels: nodes.map(node => node.data.label) })) : undefined;
+}
+
+/** A draft trial executes exactly one group, with fanout and all other groups excluded. */
+export function trialSegment(graph: LocalGraph, index: number): LocalGraph {
+  const group = publicationSegments(graph)?.[index];
+  if (!group) throw new Error('请选择有效的试跑分组');
+  const ids = group.nodeIds.filter(id => graph.nodes.some(node => node.id === id && !isSplitOperator(node)));
+  if (!ids.length) throw new Error('本组只有拆分算子，不能执行草稿试跑');
+  return extractSegment(graph, ids);
 }
 
 /** Split only at a confirmed boundary; preserve internal edges and rebase external inputs. */

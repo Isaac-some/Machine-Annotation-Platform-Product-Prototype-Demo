@@ -27,6 +27,14 @@ function useMapStore() {
   const raw = useSyncExternalStore(subscribe, () => localStorage.getItem(MAP_KEY) ?? INITIAL_MAP, () => INITIAL_MAP);
   return useMemo(() => { try { return { ...JSON.parse(INITIAL_MAP), ...JSON.parse(raw) } as MapStore; } catch { return JSON.parse(INITIAL_MAP) as MapStore; } }, [raw]);
 }
+function createGraphStore(keys: string[]) {
+  const read = () => typeof window === 'undefined' ? '[]' : JSON.stringify(keys.map(key => localStorage.getItem(key)));
+  let current = read();
+  return { snapshot: () => current, subscribe: (listener: () => void) => {
+    const refresh = () => { const next = read(); if (next !== current) { current = next; listener(); } };
+    const cleanup = subscribe(refresh); refresh(); return cleanup;
+  } };
+}
 function saveMap(store: MapStore) { localStorage.setItem(MAP_KEY, JSON.stringify(store)); window.dispatchEvent(new Event(MAP_EVENT)); }
 function useGraph(key?: string) {
   const raw = useSyncExternalStore(subscribe, () => key ? localStorage.getItem(key) ?? "null" : "null", () => "null");
@@ -45,7 +53,7 @@ function isProcess(node: GraphNode) { return node.type !== "start" && node.type 
 
 export function StageMapPage() {
   const router = useRouter(); const pathname = usePathname(); const searchParams = useSearchParams();
-  const flowMode = pathname.endsWith("/flows");
+  const flowMode = pathname.replace(/\/$/, "").endsWith("/flows");
   const workspace = useWorkspace(); const mapStore = useMapStore();
   const [keyword, setKeyword] = useState(""); const [domain, setDomain] = useState("全部算子");
   const [days, setDays] = useState<30 | 7>(30); const [status, setStatus] = useState("all"); const [offlineOnly, setOfflineOnly] = useState(false);
@@ -54,10 +62,20 @@ export function StageMapPage() {
   const [form] = Form.useForm(); const [msg, contextHolder] = message.useMessage();
   const operators = useMemo(() => OPERATORS.map(op => ({ ...op, ...mapStore.operators[String(op.id)] })), [mapStore]);
   const flows = useMemo(() => workspace.groups.flatMap(group => group.drafts.map(flow => ({ ...flow, project: group.project }))), [workspace.groups]);
-  const graphSnapshot = useSyncExternalStore(subscribe, () => JSON.stringify(flows.map(flow => localStorage.getItem(flow.graphKey ?? "annotation-demo.graph." + flow.id))), () => "[]");
+  const graphStore = useMemo(() => createGraphStore(flows.map(flow => flow.graphKey ?? 'annotation-demo.graph.' + flow.id)), [flows]);
+  const graphSnapshot = useSyncExternalStore(graphStore.subscribe, graphStore.snapshot, () => '[]');
   const savedGraphs = useMemo(() => { try { return (JSON.parse(graphSnapshot) as (string | null)[]).map(raw => { try { return JSON.parse(raw ?? "null") as Graph | null; } catch { return null; } }); } catch { return []; } }, [graphSnapshot]);
   const flowOnline = (flow: PipelineDraft) => flow.status === "published" && mapStore.flowAvailability[flow.id] !== false;
-  const references = (op: LocalOperator) => flows.filter((flow, index) => flowOnline(flow) && savedGraphs[index]?.nodes?.some(node => (node.data?.operatorId ?? node.data?.op) === op.code));
+  const referenceIndex = useMemo(() => {
+    const index = new globalThis.Map<string, typeof flows>();
+    flows.forEach((flow, row) => {
+      if (flow.status !== 'published' || mapStore.flowAvailability[flow.id] === false) return;
+      const codes = new Set(savedGraphs[row]?.nodes?.map(node => node.data?.operatorId ?? node.data?.op).filter((code): code is string => Boolean(code)));
+      codes.forEach(code => index.set(code, [...(index.get(code) ?? []), flow]));
+    });
+    return index;
+  }, [flows, savedGraphs, mapStore.flowAvailability]);
+  const references = (op: LocalOperator) => referenceIndex.get(op.code) ?? [];
   const filteredOperators = operators.filter(op => {
     const text = [op.name, op.code, op.category, ...op.tags].join(" ").toLowerCase();
     const domainMatch = domain === "全部算子" || op.tags.includes(domain) || (domain === "AI 打标与模型" && op.tags.includes("模型调用")) || (domain === "表格与字段处理" && op.tags.includes("字段处理"));

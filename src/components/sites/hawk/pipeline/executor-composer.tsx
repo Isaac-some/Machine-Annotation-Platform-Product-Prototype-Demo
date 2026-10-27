@@ -18,6 +18,7 @@ export type ExecutorDraft = LocalExecutor;
 
 export type SplitPublication = { name: string; parts: { name: string; description: string }[] };
 export type SplitComposer = {
+  purpose?: 'trial';
   requestId: string;
   title: string;
   projectName?: string;
@@ -106,7 +107,7 @@ function ExecutorComposerDialog({
       }}
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 14 }}>
-        {split ? `当前画布需拆成 ${parts.length} 条工作流。遍历资源后产生多条后续输入，只有通过执行器才能按顺序串联运行。${split.projectName ? `创建后可在「${split.projectName}」的执行器页签查看。` : ''}` : '将已发布工作流按顺序串联成一个执行器，创建后配置本次输入和执行设置。'}
+        {split ? '当前画布需拆成 ' + parts.length + ' 条工作流。拆分算子会产生多条后续输入，只有通过执行器才能按顺序串联运行。' + (split.purpose === 'trial' ? '本次创建试跑执行器，用于验证完整链路。' : '') + (split.projectName ? '创建后可在「' + split.projectName + '」的' + (split.purpose === 'trial' ? '其他批次' : '执行器') + '页签查看。' : '') : '将已发布工作流按顺序串联成一个执行器，创建后配置本次输入和执行设置。'}
       </Typography.Paragraph>
       {(error || split?.error) && <Typography.Paragraph type="danger" role="alert">{error || split?.error}</Typography.Paragraph>}
       {split ? <div className="hawk-split-composer">

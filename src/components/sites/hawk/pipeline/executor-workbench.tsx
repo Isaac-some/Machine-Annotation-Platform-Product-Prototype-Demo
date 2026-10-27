@@ -70,7 +70,7 @@ export function ExecutorWorkbench() {
   const current = batches[runtime?.currentIndex ?? 0];
   const viewed = batches.find(batch => batch.id === viewedBatchId) ?? current;
   const viewedIndex = viewed ? batches.findIndex(batch => batch.id === viewed.id) : 0;
-  const back = executor.projectId ? `/hawk/project/detail/${executor.projectId}?tab=executors` : '/hawk/pipeline';
+  const back = executor.projectId ? `/hawk/project/detail/${executor.projectId}?tab=${executor.purpose === 'trial' ? 'others' : 'executors'}` : '/hawk/pipeline';
   const openInput = () => setSettingsOpen(true);
   const settings = executorSettings(executor.settings);
   const currentRate = current ? batchSuccessRate(current, settings.filterRule) : null;
@@ -91,7 +91,7 @@ export function ExecutorWorkbench() {
 
   return <div className="hawk-executor-workbench">
     {holder}
-    <header className="hawk-executor-header"><Space><Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push(back)}>{executor.projectId ? '返回项目' : '返回工作流列表'}</Button><strong>{executor.name}</strong><Tag color={runtime?.state === 'running' ? 'processing' : runtime?.state === 'completed' ? 'success' : 'default'}>{STATES[runtime?.state ?? 'ready']}</Tag></Space><span>本地模拟 · 浏览器保存</span></header>
+    <header className="hawk-executor-header"><Space><Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push(back)}>{executor.projectId ? '返回项目' : '返回工作流列表'}</Button><strong>{executor.name}</strong>{executor.purpose === 'trial' && <Tag color="purple">试跑执行器</Tag>}<Tag color={runtime?.state === 'running' ? 'processing' : runtime?.state === 'completed' ? 'success' : 'default'}>{STATES[runtime?.state ?? 'ready']}</Tag></Space><span>本地模拟 · 浏览器保存</span></header>
     {storageError && <Alert type="error" showIcon message={storageError} />}
     <div className="hawk-executor-layout">
       <aside className="hawk-executor-sidebar" aria-label="执行器控制栏">

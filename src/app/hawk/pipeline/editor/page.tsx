@@ -6,6 +6,7 @@ import { useRouter } from "@/lib/demo-navigation";
 import { readWorkspace, writeWorkspace, useWorkspace } from '@/components/sites/hawk/data/local-workspace';
 import { ExecutorComposer, type SplitComposer, type SplitPublication } from '@/components/sites/hawk/pipeline/executor-composer';
 import { draftProjectId } from '@/components/sites/hawk/data/workspace-projects';
+import { syncTrialInstances } from '@/components/sites/hawk/data/trial-instances';
 
 function EditorInner() {
   const router = useRouter();
@@ -18,16 +19,26 @@ function EditorInner() {
   const projectId = draftProjectId(workspace, draft);
   const project = workspace.projects.find(project => project.id === projectId);
   const query = new URLSearchParams({ prototype: 'phase2', profile: 'trial', draft, title: flow?.name ?? '新建工作流', project: project?.name ?? '', projectId: projectId === undefined ? '' : String(projectId) });
+  if (params.get('trial')) query.set('trial', params.get('trial')!);
   const source = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/sites/hawk/openhandle/index.html?' + query;
   useEffect(() => {
     const workspace = readWorkspace();
     writeWorkspace(workspace);
     const receive = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframe.current?.contentWindow) return;
-      if (event.data?.type === 'hawk:request-split-publish' && typeof event.data.requestId === 'string' && typeof event.data.title === 'string' && Array.isArray(event.data.parts) && event.data.parts.length > 1 && event.data.parts.length <= 100 && event.data.parts.every((part: { name?: unknown; description?: unknown; labels?: unknown }) => typeof part?.name === 'string' && typeof part.description === 'string' && Array.isArray(part.labels) && part.labels.every(label => typeof label === 'string'))) {
+      if (event.data?.type === 'hawk:request-split-publish' && typeof event.data.requestId === 'string' && typeof event.data.title === 'string' && Array.isArray(event.data.parts) && event.data.parts.length > 0 && event.data.parts.length <= 100 && event.data.parts.every((part: { name?: unknown; description?: unknown; labels?: unknown }) => typeof part?.name === 'string' && typeof part.description === 'string' && Array.isArray(part.labels) && part.labels.every(label => typeof label === 'string'))) {
         const current = readWorkspace();
         const projectId = draftProjectId(current, draft);
-        setSplit({ requestId: event.data.requestId, title: event.data.title, parts: event.data.parts, projectName: current.projects.find(project => project.id === projectId)?.name });
+        setSplit({ requestId: event.data.requestId, title: event.data.title, parts: event.data.parts, purpose: event.data.purpose === 'trial' ? 'trial' : undefined, projectName: current.projects.find(project => project.id === projectId)?.name });
+      }
+      if (event.data?.type === 'hawk:trial-history') {
+        const current = readWorkspace();
+        const owner = draftProjectId(current, draft);
+        const title = current.groups.flatMap(group => group.drafts).find(flow => flow.id === draft)?.name;
+        if (owner !== undefined && title) {
+          const next = syncTrialInstances(current, draft, owner, title, event.data.runs);
+          if (next !== current) writeWorkspace(next);
+        }
       }
       if (event.data?.type === 'hawk:split-publish-error') setSplit(current => current && current.requestId === event.data.requestId ? { ...current, error: String(event.data.message) } : current);
       if (event.data?.type === 'hawk:back') {
@@ -38,7 +49,11 @@ function EditorInner() {
       }
     };
     window.addEventListener('message', receive);
-    return () => window.removeEventListener('message', receive);
+    return () => {
+      window.removeEventListener('message', receive);
+      const current = readWorkspace();
+      if (current.trialRuns?.some(run => run.draftId === draft && run.phase === 'running')) writeWorkspace({ ...current, trialRuns: current.trialRuns.map(run => run.draftId === draft && run.phase === 'running' ? { ...run, phase: 'failed' } : run) });
+    };
   }, [draft, router]);
   const reply = (publication?: SplitPublication) => {
     if (!split) return;

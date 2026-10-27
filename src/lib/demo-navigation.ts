@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from 'react';
 import { useRouter as useNextRouter } from 'next/navigation';
 
 /** Query routes let newly created local records survive refresh on static hosting. */
@@ -8,6 +9,6 @@ export function demoRoute(path: string): string {
 }
 export function useRouter() {
   const router = useNextRouter();
-  return { ...router, push: (href: string, options?: Parameters<typeof router.push>[1]) => router.push(demoRoute(href), options), replace: (href: string, options?: Parameters<typeof router.replace>[1]) => router.replace(demoRoute(href), options) };
+  return useMemo(() => ({ ...router, push: (href: string, options?: Parameters<typeof router.push>[1]) => router.push(demoRoute(href), options), replace: (href: string, options?: Parameters<typeof router.replace>[1]) => router.replace(demoRoute(href), options) }), [router]);
 }
 export const publicAsset = (path: string) => (process.env.NEXT_PUBLIC_BASE_PATH || '') + path;

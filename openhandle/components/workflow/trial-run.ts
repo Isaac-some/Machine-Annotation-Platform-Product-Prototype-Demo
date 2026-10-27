@@ -4,8 +4,10 @@ import { workflowOutputNodes } from './workflow-outputs';
 
 /** Local demonstration records. No model, storage or execution service is called. */
 export type TrialSample = {
-  id: string; source: "platform" | "local"; name: string; type: string; size?: number;
+  id: string; source: "platform" | "local" | "cid"; name: string; type: string; size?: number;
   previewUrl: string; values: Record<string, unknown>;
+  resource?: { cid: string; sourceRunId: string };
+  dataRecord?: boolean;
   upload?: { status: 'ready'; path: string; simulated: true };
 };
 export const platformTrialSamples = [
@@ -109,7 +111,7 @@ export function simulateTrial(nodes: TrialNode[], edges: { source: string; targe
         if (node.id === failureNode) throw new Error("本轮演示返回不符合配置的输出结构");
         if (node.config["跳过"]) throw new Error("本地演示暂不支持跳过算子，请关闭跳过设置后重试");
         if (node.operatorId === "demo.vod.upload.tos") {
-          if (!sample.type.startsWith("video/")) throw new Error("视频转存需要视频资源，请更换所选文件");
+          if (sample.source !== "cid" && !sample.dataRecord && !sample.type.startsWith("video/")) throw new Error("视频转存需要视频资源，请更换所选文件");
           if (typeof record.inputs.vid !== "string") throw new Error("视频转存缺少本轮 vid");
           record.outputs = { tos_path: `tos://demo/${encodeURIComponent(record.inputs.vid)}/${encodeURIComponent(sample.name)}` };
         } else if (node.operatorId === 'demo.tos.list') {

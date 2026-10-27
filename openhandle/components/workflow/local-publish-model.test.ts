@@ -34,3 +34,24 @@ describe('local publication boundaries', () => {
     expect(() => extractSegment(graph, [])).toThrow('拆分段不能为空');
   });
 });
+
+import { trialSegment } from './local-publish-model';
+it('partial draft trial excludes fanout and other groups, without mutating the draft', () => {
+  const list = createNode(getOperator('demo.tos.list')!, 'directory', { x: 0, y: 0 });
+  const ai = createNode(getOperator('demo.ai-platform.gemini')!, 'ai', { x: 180, y: 0 });
+  ai.data.mappings.tos_path = { sourceType: 'upstream', sourceNodeId: 'directory', sourceField: 'tos_path' };
+  const graph = { nodes: [list, ai], edges: [{ id: 'edge', source: 'directory', target: 'ai' }] };
+  const before = JSON.stringify(graph);
+  expect(() => trialSegment(graph, 0)).toThrow('只有拆分算子');
+  const partial = trialSegment(graph, 1);
+  expect(partial.nodes.map(node => node.id)).toEqual(['segment-start', 'ai', 'segment-end']);
+  expect(partial.nodes[1].data.mappings.tos_path.sourceNodeId).toBe('segment-start');
+  expect(JSON.stringify(graph)).toBe(before);
+  expect(() => trialSegment(graph, 9)).toThrow('有效');
+});
+it('all registered fanout operators trigger the same publication and trial boundary rule', () => {
+  const split = createNode(getOperator('demo.csv.expand')!, 'split', { x: 0, y: 0 });
+  const ai = createNode(getOperator('demo.ai-platform.gemini')!, 'ai', { x: 180, y: 0 });
+  expect(publicationSegments({ nodes: [split, ai], edges: [{ id: 'edge', source: 'split', target: 'ai' }] })?.length).toBe(2);
+  expect(publicationSegments({ nodes: [split], edges: [] })?.length).toBe(1);
+});

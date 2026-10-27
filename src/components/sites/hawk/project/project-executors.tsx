@@ -13,7 +13,7 @@ export function ProjectExecutors({ projectId }: { projectId: number }) {
   const router = useRouter();
   const workspace = useWorkspace();
   const [keyword, setKeyword] = useState('');
-  const rows = workspace.executors.filter(executor => executor.projectId === projectId && `${executor.name} ${executor.id}`.toLowerCase().includes(keyword.trim().toLowerCase()));
+  const rows = workspace.executors.filter(executor => executor.purpose !== 'trial' && executor.projectId === projectId && `${executor.name} ${executor.id}`.toLowerCase().includes(keyword.trim().toLowerCase()));
   const columns: ColumnsType<LocalExecutor> = [
     { title: '执行器名称', width: 220, render: (_, executor) => <><Typography.Text strong>{executor.name}</Typography.Text><div><Typography.Text type="secondary" style={{ fontSize: 11 }}>{executor.id}</Typography.Text></div></> },
     { title: '执行顺序', width: 320, render: (_, executor) => <span title={executor.flows.map(flow => flow.name).join(' → ')}>{executor.flows.map(flow => flow.name).join(' → ')}</span> },

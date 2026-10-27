@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronDown, ChevronUp, Copy, Da
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { createTrialSample, trialResultNodes, trialOutputSummary, type NodeTrialRecord, type TrialSample } from "./trial-run";
+import { trialFileRecord } from './trial-resource';
 
 import { TRIAL_LIMIT, TRIAL_LIFETIME, type TrialRetention } from "./trial-history";
 
@@ -53,11 +54,11 @@ export function TrialRunHistory({ runs, selectedId, onSelect, onEdit, onDelete, 
 }
 
 export function TrialSamplePreview({ sample }: { sample: TrialSample }) {
-  return <div className="p2-sample-preview">{sample.type.startsWith("video/") ? <video src={sample.previewUrl} controls preload="metadata" /> : sample.type.startsWith("image/") ? <img src={sample.previewUrl} alt={sample.name} /> : sample.type.startsWith("audio/") ? <audio src={sample.previewUrl} controls /> : <p>此文件暂无在线预览，可核对下方文件信息。</p>}<strong>{sample.name}</strong><p>{sample.source === "platform" ? "平台演示资源" : "本地文件"} · {sample.type || "未知格式"}{sample.size !== undefined ? ` · ${(sample.size / 1024).toFixed(1)} KB` : ""}</p></div>;
+  return <div className="p2-sample-preview">{sample.type.startsWith("video/") ? <video src={sample.previewUrl} controls preload="metadata" /> : sample.type.startsWith("image/") ? <img src={sample.previewUrl} alt={sample.name} /> : sample.type.startsWith("audio/") ? <audio src={sample.previewUrl} controls /> : <p>此文件暂无在线预览，可核对下方文件信息。</p>}<strong>{sample.name}</strong><p>{sample.source === "platform" ? "平台演示资源" : sample.source === "cid" ? "试跑产出 CID" : "本地文件"} · {sample.type || "未知格式"}{sample.size !== undefined ? ` · ${(sample.size / 1024).toFixed(1)} KB` : ""}</p></div>;
 }
 
-export function TrialSamplePreparation({ sample, revision, blocked, limitReached, onChange, onRun, onView, onNotice, onLocalUrl }: {
-  sample: TrialSample | null; revision: number; blocked: boolean; limitReached: boolean;
+export function TrialSamplePreparation({ sample, revision, blocked, limitReached, onChange, onRun, onView, onNotice, onLocalUrl, grouped = false }: {
+  grouped?: boolean; sample: TrialSample | null; revision: number; blocked: boolean; limitReached: boolean;
   onChange: (sample: TrialSample | null) => void; onRun: () => void;
   onView: (sample: TrialSample) => void; onNotice: (message: string) => void; onLocalUrl: (url: string) => void;
 }) {
@@ -77,10 +78,12 @@ export function TrialSamplePreparation({ sample, revision, blocked, limitReached
       if (!file.size) throw new Error('文件为空，请更换文件');
       // Validate that the selected file is readable; the resource service is not connected.
       await file.arrayBuffer();
+      const record = /\.(jsonl|ndjson)$/i.test(file.name) ? trialFileRecord(await file.text()) : undefined;
       await new Promise(resolve => setTimeout(resolve, 450));
       if (request !== generation.current) return;
       const previewUrl = URL.createObjectURL(file); onLocalUrl(previewUrl);
-      onChange(createTrialSample({ id: `upload-${crypto.randomUUID()}`, source: 'local', name: file.name, type: file.type, size: file.size, previewUrl }));
+      const sample = createTrialSample({ id: 'upload-' + crypto.randomUUID(), source: 'local', name: file.name, type: file.type, size: file.size, previewUrl });
+      onChange(record ? { ...sample, values: record, dataRecord: true } : sample);
       setUploading(false);
     } catch (issue) {
       if (request !== generation.current) return;
@@ -99,8 +102,8 @@ export function TrialSamplePreparation({ sample, revision, blocked, limitReached
     }} /></div>
     {uploading && <p className="p2-upload-state" role="status"><LoaderCircle size={16} className="p2-spin" />正在上传并取得 TOS 路径（本地模拟）</p>}
     {uploadError && <div className="p2-error" role="alert">{uploadError} <button onClick={() => { if (retryFile.current) void selectLocal(retryFile.current); }}>重试上传</button></div>}
-    {sample ? <div className="p2-selected-sample"><File size={20} /><div><strong>{sample.name}</strong><small>{sample.source === "platform" ? "平台演示资源" : "本地文件"} · 本轮 1 条</small>{sample.upload && <small className="p2-upload-ready"><CheckCircle2 size={13} />上传完成（模拟） · <code>{sample.upload.path}</code></small>}</div><button onClick={() => onView(sample)}>查看</button><button onClick={() => sample.source === "platform" ? openPicker() : upload.current?.click()}>更换</button><button aria-label="移除试跑资源" onClick={() => { generation.current += 1; setUploading(false); setUploadError(''); onChange(null); }}><X size={15} /></button></div> : <p className="p2-sample-empty">尚未选择资源。每轮使用一个文件。</p>}
-    <div className="p2-sample-start"><p>本地文件先模拟上传取得 TOS 路径；开始后固定本轮样本和配置。</p><Button onClick={onRun} disabled={!limitReached && (!sample || blocked || uploading || Boolean(uploadError))}><Play size={15} />开始试跑</Button></div>
+    {sample ? <div className="p2-selected-sample"><File size={20} /><div><strong>{sample.name}</strong><small>{sample.source === "platform" ? "平台演示资源" : sample.source === "cid" ? "试跑产出 CID" : "本地文件"} · 本轮 1 条</small>{sample.resource && <small><code>{sample.resource.cid}</code></small>}{sample.upload && <small className="p2-upload-ready"><CheckCircle2 size={13} />上传完成（模拟） · <code>{sample.upload.path}</code></small>}</div><button onClick={() => onView(sample)}>查看</button><button onClick={() => sample.source === "platform" ? openPicker() : upload.current?.click()}>更换</button><button aria-label="移除试跑资源" onClick={() => { generation.current += 1; setUploading(false); setUploadError(''); onChange(null); }}><X size={15} /></button></div> : <p className="p2-sample-empty">尚未选择资源。每轮使用一个文件。</p>}
+    <div className="p2-sample-start"><p>本地文件先模拟上传取得 TOS 路径；开始后固定本轮样本和配置。</p><Button onClick={onRun} disabled={!limitReached && (!sample || blocked || uploading || Boolean(uploadError))}><Play size={15} />{grouped ? '整组重新试跑' : '开始试跑'}</Button></div>
     <Dialog open={picker} onOpenChange={open => { setPicker(open); if (!open) setPlatformEntry(null); }}><DialogContent className="p2-resource-picker">
       <DialogTitle>{platformEntry ?? '选择平台资源'}</DialogTitle>
       {platformEntry ? <><div className="p2-platform-handoff"><ArrowUpRight size={32} aria-hidden="true" /><DialogDescription className="p2-platform-placeholder-description">通过资源管理平台当前能力承接</DialogDescription><small>当前原型暂不展开此界面</small></div><div className="p2-platform-placeholder" aria-label="资源管理平台占位界面" /><footer><Button variant="outline" onClick={() => setPlatformEntry(null)}><ArrowLeft size={15} />返回</Button></footer></> : <>

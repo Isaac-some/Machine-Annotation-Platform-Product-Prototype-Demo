@@ -29,7 +29,7 @@ import { FloatingDock } from "@/components/ui/floating-dock";
 import { SourcePicker } from "./source-picker";
 import { BasicLibrary } from './basic-library';
 import { LocalPublish } from './local-publish';
-import { publicationSegments } from './local-publish-model';
+import { publicationSegments, trialSegment, isSplitOperator } from './local-publish-model';
 import { LocalVersions } from './local-versions';
 import { buildOutputSchema, columnTypes, importOutputSchema, outputShapeErrors, outputColumnPath, type OutputShapeField } from "./output-schema";
 import { DiagnosisPanel } from "./diagnosis-panel";
@@ -42,6 +42,9 @@ import { workflowOutputFields } from './workflow-outputs';
 import { simulateTrial, retainTrial, trialResultNodes, type TrialSample, type NodeTrialRecord } from "./trial-run";
 import { activeTrials, deleteTrial, trialCapacity, updateTrialMetadata, TRIAL_LIMIT, type TrialRetention } from "./trial-history";
 import { loadTrialHistory, saveTrialHistory } from "./trial-history-store";
+import { TrialScopeSelection } from './trial-scope-selection';
+import { trialResource } from './trial-resource';
+import { TrialCidInput, TrialResourceActions } from './trial-resource-controls';
 import { TrialDock, TrialRunDetails, TrialRunHistory, TrialSamplePreparation, TrialSamplePreview } from "./trial-run-panel";
 import { ReferenceTextEditor } from "./reference-text-editor";
 import { NodeReferenceGlyph } from "./node-reference-icon";
@@ -58,7 +61,7 @@ type PhaseData = WorkflowNodeData & {
   expanded?: boolean;
   readOnly?: boolean;
   issue?: string;
-  sourcePreview?: boolean;
+  sourcePreview?: boolean; ignored?: boolean;
   onAdd?: (id: string) => void;
   onReference?: (id: string) => void;
   onExpand?: (id: string) => void;
@@ -67,7 +70,7 @@ type PhaseNode = Node<PhaseData, "phase2" | "phase2group">;
 type PhaseEdge = Edge<{ onInsert?: (id: string) => void; mappingFields?: { key: string; label: string }[]; onMap?: (field: string) => void }, "phase2">;
 type Issue = { nodeId: string; field?: string; message: string };
 type Run = TrialRetention & {
-  id: string; sequence?: number; failures: Issue[]; sample: TrialSample; records: Record<string, NodeTrialRecord>;
+  id: string; sequence?: number; scope?: string; groupIndex?: number; failures: Issue[]; sample: TrialSample; records: Record<string, NodeTrialRecord>;
   phase: "running" | "passed" | "failed";
   revision: number; count: number; startedAt: string;
   nodes: PhaseNode[]; edges: PhaseEdge[]; inputs: string[]; unexecutedIds?: string[]; failureNode?: string; failureReason?: string;
@@ -294,7 +297,7 @@ function CompactNode({ id, data, selected }: NodeProps<PhaseNode>) {
       {branches.map((b, i) => <div key={b.id} className="p2-branch-port" style={{ top: `${(i + 1) / (branches.length + 1) * 100}%` }}><span>{b.label}</span><Handle type="source" id={b.id} position={Position.Right} className="p2-handle" style={{ top: "50%" }} /></div>)}
     </div>
     {data.sourcePreview && <span className="p2-source-guide">正在选择此节点的输出</span>}
-    <div className="p2-node-label">{data.label}</div>
+    <div className="p2-node-label">{data.label}{data.ignored && <span className="p2-ignored-badge">忽略</span>}</div>
     <div className="p2-node-sub">{data.flowId ? `Flow · ${getFlow(data)?.nodes.length} 步骤 · ${data.flowVersion}` : data.purpose ? modelNames[data.operatorId] : terminal ? data.operatorId === "control.start" ? "工作流输入" : "工作流输出" : data.operatorId}</div>
     {data.kind !== "result" && branches.length === 0 && !data.readOnly && <button className="p2-node-plus nodrag nopan" aria-label={`在${data.label}后添加节点`} onClick={(e) => { e.stopPropagation(); data.onAdd?.(id); }}><Plus size={14} /></button>}
     {data.flowId && <button className="p2-flow-expand nodrag nopan" onClick={(e) => { e.stopPropagation(); data.onExpand?.(id); }}><ChevronDown size={12} />展开步骤</button>}
@@ -397,7 +400,7 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
   const [pendingSelection, setPendingSelection] = useState<{ id: string | null } | null>(null);
   const [library, setLibrary] = useState(false);
   const [libraryMode, setLibraryMode] = useState<SearchMode>("operator");
-  const activeCandidates = useMemo(() => lean ? candidates.filter(candidate => !['phase2.ratio', 'phase2.merge', 'control.condition', 'control.split', 'control.aggregate'].includes(candidate.operatorId ?? candidate.id)) : candidates, [lean]);
+  const activeCandidates = useMemo(() => lean ? candidates.filter(candidate => new Set(['purpose.understanding', 'demo.ai-platform.deepseek', 'demo.ai-platform.qwen_tmp1', 'purpose.generation', 'demo.tos.list', 'demo.csv.expand', 'demo.vod.upload.tos', 'demo.vod.video.get', 'demo.tos.sign', 'demo.image.resize', 'demo.expr.check', 'demo.exif.get', 'demo.tos.compress.360p', 'demo.vod.frame.extract', 'control.result', 'flow.video-labeling-demo', 'flow.video-preview']).has(candidate.id)) : candidates, [lean]);
   const activeFlows = useMemo(() => flowSource.filter((flow) => activeCandidates.some((candidate) => candidate.id === flow.id && canUseCapability(candidate))), [activeCandidates]);
   const [workspace, setWorkspace] = useState<{ id: string; title: string; origin?: DraftOrigin; returnId?: string }>({ id: lean ? entry.id : 'original', title: lean ? entry.title : '视频内容标注' });
   const [recentDraftId, setRecentDraftId] = useState<string | null>(null);
@@ -446,6 +449,9 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
   const [canvasMode, setCanvasMode] = useState<"pan" | "select">("pan");
   const [notice, setNotice] = useState("");
   const [publishOpen, setPublishOpen] = useState(false);
+  const [trialDecisionOpen, setTrialDecisionOpen] = useState(false);
+  const [trialScope, setTrialScope] = useState<{ index: number; revision: number } | null>(null);
+  const [publishPurpose, setPublishPurpose] = useState<'trial' | undefined>();
   const [trialLimitOpen, setTrialLimitOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [historyTick, setHistoryTick] = useState(0);
@@ -477,7 +483,11 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
     if (loadedHistories.current.has(workspace.id)) { setHistoryReady(workspace.id); return; }
     loadTrialHistory<Run>(workspace.id, (url) => sampleUrls.current.push(url)).then(({ runs, sequence }) => {
       if (cancelled) return;
-      setRunHistory(runs); roundSequences.current[workspace.id] = sequence;
+      setRunHistory(runs);
+      const requested = new URLSearchParams(window.location.search).get('trial');
+      const target = requested && runs.find(run => run.id === requested);
+      if (target) { setViewedRunId(target.id); setDock('run'); setExpandedDock(true); setRunNodeId(trialResultNodes(target.nodes.map(node => ({ ...node.data, id: node.id })), Object.keys(target.records))[0]?.id ?? ''); }
+      roundSequences.current[workspace.id] = sequence;
       loadedHistories.current.add(workspace.id); setHistoryReady(workspace.id);
     }).catch(() => {
       if (cancelled) return;
@@ -490,6 +500,16 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
     if (historyReady !== workspace.id) return;
     saveTrialHistory(workspace.id, run ? [run, ...runHistory.filter((item) => item.id !== run.id)] : runHistory, roundSequences.current[workspace.id] ?? 0).then(() => setStorageError("")).catch(() => setStorageError("历史记录未能保存到浏览器，本次仅在当前页面保留。请检查浏览器存储空间。"));
   }, [run, runHistory, workspace.id, historyReady]);
+
+  const lastTrialSummary = useRef('');
+  useEffect(() => {
+    if (historyReady !== workspace.id || window.parent === window) return;
+    const runs = trialEntries.map(item => ({ id: item.id, sequence: item.sequence, phase: item.phase, createdAt: item.createdAt, revision: item.revision, kept: Boolean(item.kept), scope: item.scope }));
+    const summary = JSON.stringify({ draft: workspace.id, runs });
+    if (summary === lastTrialSummary.current) return;
+    lastTrialSummary.current = summary;
+    window.parent.postMessage({ type: 'hawk:trial-history', runs }, window.location.origin);
+  }, [historyReady, workspace.id, trialEntries]);
 
   const rememberWorkspace = () => clone({
     workspace, nodes, edges, selectedId, draft, draftChanged, revision, saved,
@@ -708,6 +728,8 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
   const launchSetup = () => {
     if (run?.phase === "running") { setViewedRunId(null); setDock("run"); setExpandedDock(true); return; }
     if (draftChanged) { setNotice("请先保存当前节点配置，再试跑"); return; }
+    if (segments) { setTrialDecisionOpen(true); return; }
+    setTrialScope(null);
     validateDraft(true);
     setDock("setup"); setLibrary(false); setExpandedDock(true); setThreeColumns(false);
     requestAnimationFrame(() => fitView({ padding: 0.18, maxZoom: 1, duration: 180 }));
@@ -718,27 +740,34 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
     const currentEntries = activeTrials(trialEntries);
     if (!trialCapacity(currentEntries)) { setTrialLimitOpen(true); return; }
     if (draftChanged) { setNotice("请先保存当前节点配置，再试跑"); return; }
+    if (segments && (!trialScope || trialScope.revision !== revision || !trialGraph)) { setTrialDecisionOpen(true); return; }
     if (!trialSample) { setNotice("请先选择一条试跑资源"); return; }
-    if (issues.length) { setDock("setup"); setExpandedDock(true); setNotice("请先处理底部校验提示，再试跑"); return; }
+    if (trialIssues.length) { setDock("setup"); setExpandedDock(true); setNotice("请先处理底部校验提示，再试跑"); return; }
+    const executionGraph = trialGraph ?? { nodes, edges };
+    const entryNode = executionGraph.nodes.find(node => node.data.operatorId === 'control.start');
+    const missing = entryNode ? outputFields(entryNode.data as PhaseData).filter(field => field.required && trialSample.values[field.key] === undefined) : [];
+    if (missing.length) { setNotice('本组输入缺少字段：' + missing.map(field => field.key).join('、') + '，请更换 CID 或资源'); return; }
     timers.current.forEach(window.clearTimeout); timers.current = [];
-    const active = nodes.filter((node) => !node.data.readOnly);
+    const active = executionGraph.nodes.filter((node) => !node.data.readOnly);
     const failureNode = failureDemo ? active.find((node) => node.data.purpose)?.id : undefined;
     const result = simulateTrial(active.map((node) => ({
       id: node.id, label: node.data.label, operatorId: node.data.operatorId, kind: node.data.kind,
       inputs: inputFields(node.data), outputs: outputFields(node.data), config: lean ? Object.fromEntries(Object.entries(node.data.config).filter(([key]) => key !== 'AI输出结构')) : node.data.config,
       mappings: node.data.mappings, outputRoot: node.data.purpose === "understanding" ? getOperator(node.data.operatorId)?.outputs[0]?.key : undefined, outputShape: !lean && node.data.purpose === "understanding" ? outputShape(node.data) : undefined,
-    })), edges, trialSample, failureNode);
+    })), executionGraph.edges, trialSample, failureNode);
     const snapshot: Run = {
+      // This identity is allocated only by the user-triggered startRun handler.
+      // eslint-disable-next-line react-hooks/purity
       id: `trial-${crypto.randomUUID()}`, createdAt: Date.now(), sequence: (roundSequences.current[workspace.id] ?? 0) + 1, failures: [], phase: "running", revision, count: 1,
-      inputs: [String(trialSample.values.vid)], sample: clone(trialSample),
+      inputs: [trialSample.resource?.cid ?? String(trialSample.values.vid ?? trialSample.id)], sample: clone(trialSample), groupIndex: trialScope?.index, scope: trialScope && segments ? '仅第 ' + (trialScope.index + 1) + ' 组（已排除拆分算子和其他组）' : undefined,
       records: Object.fromEntries(result.order.map((id) => [id, { nodeId: id, status: "queued", inputs: {}, config: {} }])),
-      startedAt: new Date().toLocaleTimeString("zh-CN", { hour12: false }), nodes: clone(nodes), edges: clone(edges),
+      startedAt: new Date().toLocaleTimeString("zh-CN", { hour12: false }), nodes: clone(executionGraph.nodes) as PhaseNode[], edges: clone(executionGraph.edges) as PhaseEdge[],
     };
     roundSequences.current[workspace.id] = snapshot.sequence!;
     setRunNodeId(trialResultNodes(active.map((node) => ({ ...node.data, id: node.id })), result.order)[0]?.id ?? "");
     if (run) setRunHistory((history) => retainTrial(history, run));
     setViewedRunId(null); setRun(snapshot); setDock("run"); setExpandedDock(true); setDiagnosisOpen(false);
-    setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, runState: node.data.readOnly ? "idle" : "queued" } })));
+    setNodes((current) => current.map((node) => ({ ...node, data: { ...node.data, runState: active.some(item => item.id === node.id) ? "queued" : "idle" } })));
     result.order.forEach((id, index) => {
       const record = result.records[id];
       timers.current.push(window.setTimeout(() => {
@@ -877,16 +906,28 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
       setSaved(true); setNotice('草稿已保存到本机'); return true;
     } catch { setNotice('草稿保存失败，请检查浏览器存储空间'); return false; }
   };
-  const boundary = lean ? nodes.find(node => node.data.operatorId === 'demo.tos.list' && edges.some(edge => edge.source === node.id && nodes.find(target => target.id === edge.target)?.data.kind !== 'result')) : undefined;
+  const boundary = lean ? nodes.find(isSplitOperator) : undefined;
   let segments: { nodeIds: string[]; labels: string[] }[] | undefined;
-  try { if (lean && boundary) segments = publicationSegments({ nodes, edges }); } catch { /* The validation panel reports cyclic graphs before publication. */ }
-  const openLocalPublish = () => {
+  try { if (lean) segments = publicationSegments({ nodes, edges }); } catch { /* Validation reports cycles. */ }
+  let trialGraph: ReturnType<typeof trialSegment> | undefined;
+  try { if (segments && trialScope?.revision === revision) trialGraph = trialSegment({ nodes, edges }, trialScope.index); } catch { /* Start opens the scope decision again. */ }
+  const trialIssues = trialGraph ? getIssues(trialGraph.nodes as PhaseNode[], trialGraph.edges as PhaseEdge[], lean) : issues;
+  const selectTrialGroup = (index: number) => {
+    try {
+      const graph = trialSegment({ nodes, edges }, index);
+      if (trialScope?.index !== index) { setTrialSample(null); setSampleInput(''); } setTrialScope({ index, revision }); setTrialDecisionOpen(false); setDock('setup'); setLibrary(false); setExpandedDock(true);
+      const errors = getIssues(graph.nodes as PhaseNode[], graph.edges as PhaseEdge[], lean);
+      setNotice(errors.length ? '本组仍有配置问题，请按下方提示修复' : '本轮只测试所选组；拆分算子和其他组不会执行，当前草稿不变');
+    } catch (error) { setNotice(error instanceof Error ? error.message : '分组暂不可试跑'); }
+  };
+  const openLocalPublish = (purpose?: 'trial') => {
     if (draftChanged) { setNotice('请先保存节点配置'); return; }
     const publishIssues = getIssues(prepareGraphInputs(nodes, edges).nodes, edges, lean);
     if (publishIssues.length) { setDock('validation'); setExpandedDock(true); setNotice('请先校验并处理配置提示'); return; }
-    if (saveLocalDraft()) setPublishOpen(true);
+    if (saveLocalDraft()) { setPublishPurpose(purpose); setPublishOpen(true); }
   };
-  const keyedNodes = nodes.map((n) => ({ ...n, selected: n.id === selectedId, data: { ...n.data, sourcePreview: n.id === previewSource, issue: issues.find((i) => i.nodeId === n.id)?.message, onAdd: (id: string) => openLibrary({ source: id }), onReference: diagnoserEnabled && diagnosis && diagnosis.nodes.some((node) => node.id === n.id) ? referenceNode : undefined, onExpand: expandFlow } }));
+  const trialNodeIds = trialGraph ? new Set(trialGraph.nodes.map(node => node.id)) : undefined;
+  const keyedNodes = nodes.map((n) => ({ ...n, className: trialNodeIds && !trialNodeIds.has(n.id) && !['control.start', 'control.result'].includes(n.data.operatorId) ? 'p2-trial-ignored' : '', selected: n.id === selectedId, data: { ...n.data, ignored: Boolean(trialNodeIds && !trialNodeIds.has(n.id) && !['control.start', 'control.result'].includes(n.data.operatorId)), sourcePreview: n.id === previewSource, issue: issues.find((i) => i.nodeId === n.id)?.message, onAdd: (id: string) => openLibrary({ source: id }), onReference: diagnoserEnabled && diagnosis && diagnosis.nodes.some((node) => node.id === n.id) ? referenceNode : undefined, onExpand: expandFlow } }));
   const keyedEdges = edges.map((e) => {
     const target = nodes.find((node) => node.id === e.target);
     const mappingFields = target && !lean ? Object.entries(target.data.mappings).filter(([, binding]) => binding.sourceType === "upstream" && binding.sourceNodeId === e.source).map(([key, binding]) => ({ key, label: `${nodes.find((node) => node.id === binding.sourceNodeId)?.data.label ?? "来源已失效"} · 输出字段 ${binding.sourceField} → 输入 ${key}` })) : [];
@@ -1036,13 +1077,15 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
         {dock !== "none" && <TrialDock height={dockHeight} setHeight={setDockHeight} maximized={dockMaximized} setMaximized={setDockMaximized} className={`${dock === "validation" ? "validation" : ""} ${library ? "with-library" : ""} ${selectedId && !threeColumns ? "with-inspector" : ""}`} expanded={expandedDock} onExpanded={(expanded) => { if (expanded) setLibrary(false); setExpandedDock(expanded); }}
           title={dock === "validation" ? `校验 · ${issues.length ? `${issues.length} 项待检查` : "通过"}` : dock === "setup" ? "试跑 · 样本准备" : dock === "history" ? "历史试跑" : viewedRun?.phase === "running" ? "试跑中" : viewedRun?.phase === "passed" ? "试跑完成" : "试跑未完成"}
           meta={dock === "validation" ? "检查配置，不执行数据" : dock === "setup" ? "每轮一条资源" : dock === "history" ? `${trialEntries.length} 轮记录` : viewedRun ? `第 ${viewedRun.sequence ?? viewedRun.id.split("-").at(-1)} 次 · ${viewedRun.startedAt} · 快照 ${viewedRun.revision}` : ""}
-          actions={<>{dock === "run" && viewedRun?.phase === "running" && <Button variant="outline" size="sm" onClick={stopRun}>停止试跑</Button>}{dock === "run" && viewedRun?.phase !== "running" && <>{!lean && <Button variant="outline" size="sm" onClick={() => openDiagnosis("trial", viewedRun)}><Bot size={15} />{viewedRun?.phase === "failed" ? "AI 诊断并修复" : "结果不符合预期？"}</Button>}<button onClick={launchSetup}>再次试跑</button></>}{!expandedDock && <button onClick={() => { setDock("history"); setExpandedDock(true); setLibrary(false); }}>历史试跑 · {trialEntries.length}</button>}</>}>
+          actions={<>{dock === "run" && viewedRun?.phase === "running" && <Button variant="outline" size="sm" onClick={stopRun}>停止试跑</Button>}{dock === "run" && viewedRun?.phase !== "running" && <>{!lean && <Button variant="outline" size="sm" onClick={() => openDiagnosis("trial", viewedRun)}><Bot size={15} />{viewedRun?.phase === "failed" ? "AI 诊断并修复" : "结果不符合预期？"}</Button>}<button onClick={() => { if (viewedRun?.groupIndex !== undefined && segments?.[viewedRun.groupIndex]) { setTrialScope({ index: viewedRun.groupIndex, revision }); setTrialSample(clone(viewedRun.sample)); setDock('setup'); setExpandedDock(true); } else launchSetup(); }}>{viewedRun?.groupIndex !== undefined ? '整组重新试跑' : '再次试跑'}</button></>}{!expandedDock && <button onClick={() => { setDock("history"); setExpandedDock(true); setLibrary(false); }}>历史试跑 · {trialEntries.length}</button>}</>}>
           {dock !== "validation" && <nav className="p2-trial-tabs" aria-label="试跑视图"><button aria-current={dock === "setup" ? "page" : undefined} onClick={launchSetup}>样本准备</button><button aria-current={dock === "run" ? "page" : undefined} disabled={!viewedRun} onClick={() => { setDock("run"); setExpandedDock(true); }}>试跑结果</button><button aria-current={dock === "history" ? "page" : undefined} onClick={() => setDock("history")}>历史试跑 · {trialEntries.length}</button></nav>}
 
           <div className={`p2-dock-content${dock === "history" ? " p2-history-content" : ""}`}>{dock === "validation" ? <ValidationReview lean={lean} nodes={nodes} edges={edges} issues={issues} onFocus={focusNode} onRun={launchSetup} onAnalyze={() => openDiagnosis("validation")} onToggle={toggleDelivery} /> : dock === "history" ? <TrialRunHistory runs={trialEntries} selectedId={viewedRun?.id} onSelect={viewTrial} onEdit={editTrial} onDelete={removeTrial} storageError={storageError} /> : dock === "setup" ? <>
-            {issues.length > 0 && <div className="p2-trial-blockers" role="status"><strong>配置尚未通过校验，暂不能开始试跑</strong>{issues.map((issue, index) => <button key={`${issue.nodeId}-${index}`} onClick={() => focusNode(issue.nodeId, issue.field)}><AlertCircle size={14} /><span>{nodes.find((node) => node.id === issue.nodeId)?.data.label} · {issue.message}</span><ChevronRight size={13} /></button>)}<Button variant="outline" size="sm" onClick={() => validateDraft(true)}>重新校验</Button></div>}
-            <TrialSamplePreparation sample={trialSample} revision={revision} blocked={Boolean(issues.length) || historyReady !== workspace.id} limitReached={!trialCapacity(trialEntries)} onChange={(sample) => { setTrialSample(sample); setSampleInput(sample ? String(sample.values.vid) : ""); }} onRun={startRun} onView={setSamplePreview} onNotice={setNotice} onLocalUrl={(url) => sampleUrls.current.push(url)} />
-          </> : viewedRun ? <TrialRunDetails nodes={viewedRun.nodes.map((node) => ({ ...node.data, id: node.id }))} records={viewedRun.records} sample={viewedRun.sample} phase={viewedRun.phase} revision={viewedRun.revision} stale={stale} selectedNodeId={runNodeId} onSelect={setRunNodeId} onFocus={focusNode} onView={setSamplePreview} onNotice={setNotice} /> : null}</div>
+            {trialIssues.length > 0 && <div className="p2-trial-blockers" role="status"><strong>配置尚未通过校验，暂不能开始试跑</strong>{trialIssues.map((issue, index) => <button key={`${issue.nodeId}-${index}`} onClick={() => focusNode(issue.nodeId, issue.field)}><AlertCircle size={14} /><span>{nodes.find((node) => node.id === issue.nodeId)?.data.label} · {issue.message}</span><ChevronRight size={13} /></button>)}<Button variant="outline" size="sm" onClick={() => validateDraft(true)}>重新校验</Button></div>}
+            {trialScope && segments && <div className="p2-callout" role="status"><strong>仅测试第 {trialScope.index + 1} 组</strong><p>已排除拆分算子和其他组，不验证完整链路。请为本组单独准备输入；当前草稿不变。{trialScope.revision !== revision && '草稿已修改，请重新选择试跑范围。'}</p><button onClick={() => setTrialDecisionOpen(true)}>重新选择测试范围</button></div>}
+            <TrialCidInput resources={trialEntries.flatMap(item => { const resource = trialResource(item); return resource ? [resource] : []; })} onChange={sample => { setTrialSample(sample); setSampleInput(sample.id); }} onNotice={setNotice} />
+            <TrialSamplePreparation grouped={Boolean(trialScope && segments)} sample={trialSample} revision={revision} blocked={Boolean(trialIssues.length) || historyReady !== workspace.id} limitReached={!trialCapacity(trialEntries)} onChange={(sample) => { setTrialSample(sample); setSampleInput(sample ? String(sample.values.vid) : ""); }} onRun={startRun} onView={setSamplePreview} onNotice={setNotice} onLocalUrl={(url) => sampleUrls.current.push(url)} />
+          </> : viewedRun ? <><TrialResourceActions resource={viewedRun ? trialResource(viewedRun) : undefined} onNotice={setNotice} /><TrialRunDetails nodes={viewedRun.nodes.map((node) => ({ ...node.data, id: node.id }))} records={viewedRun.records} sample={viewedRun.sample} phase={viewedRun.phase} revision={viewedRun.revision} stale={stale} selectedNodeId={runNodeId} onSelect={setRunNodeId} onFocus={focusNode} onView={setSamplePreview} onNotice={setNotice} /></> : null}</div>
         </TrialDock>}
 
       </div>
@@ -1066,12 +1109,13 @@ function PrototypeInner({ lean = false }: { lean?: boolean }) {
       onFocus={(id, field) => { const node = nodes.find((item) => item.id === id); if (!node) { setNotice("该节点已从当前草稿移除，请对照诊断快照排查"); return; } focusNode(id, node.data.purpose === "understanding" && outputShape(node.data).some((item) => item.key === field || field?.endsWith(`.${item.key}`)) ? "AI输出结构" : field); }}
       onApply={applyRepair} onUndo={undoRepair} onNotice={setNotice} />))}
     <footer className="p2-status-footer"><span>当前项目 · {new URLSearchParams(window.location.search).get('project') || '用户工作流草稿'}</span><span>{lean ? "本地交互原型 · 试跑采用演示执行数据 · 不提交生产任务" : "复制节点引用：选中节点后 Ctrl/Cmd+C　缩放：滚轮"}</span></footer>
+    {trialDecisionOpen && <Modal title="拆分工作流如何试跑" onClose={() => setTrialDecisionOpen(false)}><TrialScopeSelection groups={(segments ?? []).map(segment => ({ labels: segment.labels, available: segment.nodeIds.some(id => nodes.some(node => node.id === id && !isSplitOperator(node))) }))} onSelect={selectTrialGroup} onClose={() => setTrialDecisionOpen(false)} onExecutor={() => { setTrialDecisionOpen(false); openLocalPublish('trial'); }} /></Modal>}
     {trialLimitOpen && <Modal title="试跑记录已满" onClose={() => setTrialLimitOpen(false)}><p>当前草稿已达到 {TRIAL_LIMIT} 条试跑记录上限。请前往历史试跑，删除不再需要的记录后再开始。</p><p>已保留的记录需先取消保留，才能删除。当前样本和配置会保留。</p><div className="p2-history-dialog-actions"><Button variant="outline" onClick={() => setTrialLimitOpen(false)}>暂不清理</Button><Button onClick={() => { setTrialLimitOpen(false); setDock('history'); setExpandedDock(true); setLibrary(false); }}>前往历史试跑</Button></div></Modal>}
     {notice && <div className="p2-toast" role="status"><Info size={16} />{notice}</div>}
     {pendingSelection && <Modal title="当前节点配置尚未保存" onClose={() => setPendingSelection(null)}><p>切换节点前，保留或放弃本次修改。</p><footer><Button variant="outline" onClick={() => setPendingSelection(null)}>继续编辑</Button><Button variant="outline" onClick={() => { choose(pendingSelection.id); setPendingSelection(null); }}>放弃修改</Button><Button onClick={() => { const nextNodes = nodes.map((n) => n.id === selectedId && draft ? { ...n, data: clone(assembledDraft()!) } : n); capture(); setNodes(nextNodes); changed(); choose(pendingSelection.id, nextNodes); setPendingSelection(null); }}>保存并切换</Button></footer></Modal>}
     {mappingOpen && <Modal title="连线与字段来源" onClose={() => setMappingOpen(false)}><p>连线表达处理顺序。输入绑定在目标节点抽屉中配置，可搜索全部可达上游字段。</p><p>字段类型或结构不兼容时，需显式使用字段映射／转换；接线不会自动猜测对应关系。</p><footer><Button variant="outline" onClick={() => { const edge = edges.find((e) => e.id === inspectedEdge); if (edge && !nodes.find((n) => n.id === edge.target)?.data.readOnly) { setMappingOpen(false); focusNode(edge.target); } }}>配置目标节点</Button><Button variant="outline" disabled={Boolean(nodes.find((n) => n.id === edges.find((e) => e.id === inspectedEdge)?.target)?.data.readOnly)} onClick={() => { capture(); setEdges((es) => es.filter((e) => e.id !== inspectedEdge)); changed(); setMappingOpen(false); setNotice("连线已删除，可撤销；请检查输入绑定"); }}>删除连线</Button><Button onClick={() => setMappingOpen(false)}>返回画布</Button></footer></Modal>}
     {schemaImport && <Modal title="导入已有 JSON Schema" onClose={() => setSchemaImport(false)}><p>粘贴项目经理已有的 Schema，先预览再替换当前输出列。嵌套字段会展开为平级列，文本列表会改为逗号分隔的文本；业务提示词由你核对。</p><Textarea aria-label="已有 JSON Schema" rows={7} placeholder={'{"type":"object","properties":{...}}'} value={schemaText} onChange={(event) => { setSchemaText(event.target.value); setImportPreview(null); setSchemaError(""); }} />{schemaError && <p className="p2-error" role="alert">{schemaError}</p>}{importPreview && <div className="p2-import-preview"><strong>将生成 {importPreview.fields.length} 个平级输出列</strong>{importPreview.changes.map((change) => <p key={change}>{change}</p>)}<div className="p2-check-fields">{importPreview.fields.map((field) => <span key={field.key}>{field.key}</span>)}</div><small>导入会替换现有列；删除或改名的已有下游引用将提示失效。</small></div>}<footer><Button variant="outline" onClick={() => setSchemaImport(false)}>取消</Button><Button variant="outline" onClick={() => { try { setImportPreview(importOutputSchema(schemaText)); setSchemaError(""); } catch (error) { setSchemaError(error instanceof Error ? error.message : "Schema 无法解析"); } }}>预览输出列</Button><Button disabled={!importPreview} onClick={() => { if (importPreview) { config("AI输出结构", JSON.stringify(importPreview.fields)); setSchemaImport(false); setNotice("输出列已导入，请核对提示词并保存配置"); } }}>应用输出列</Button></footer></Modal>}
-    {publishOpen && lean && (segments && window.parent !== window ? <LocalPublish draftId={entry.id} title={workspace.title} segments={segments} onClose={() => setPublishOpen(false)} onPublished={(id) => { setPublishOpen(false); window.parent.postMessage({ type: "hawk:published", executorId: id }, window.location.origin); }} /> : <Modal title={segments ? "发布需拆分为执行器" : "发布工作流"} onClose={() => setPublishOpen(false)}><LocalPublish draftId={entry.id} title={workspace.title} segments={segments} onLocateBoundary={() => { setPublishOpen(false); if (boundary) focusNode(boundary.id); }} onClose={() => setPublishOpen(false)} onPublished={(id) => { setPublishOpen(false); window.parent.postMessage({ type: "hawk:published", executorId: id }, window.location.origin); }} /></Modal>)}
+    {publishOpen && lean && (segments && window.parent !== window ? <LocalPublish draftId={entry.id} title={workspace.title} segments={segments} purpose={publishPurpose} onClose={() => setPublishOpen(false)} onPublished={(id) => { setPublishOpen(false); window.parent.postMessage({ type: "hawk:published", executorId: id }, window.location.origin); }} /> : <Modal title={segments ? "发布需拆分为执行器" : "发布工作流"} onClose={() => setPublishOpen(false)}><LocalPublish draftId={entry.id} title={workspace.title} segments={segments} purpose={publishPurpose} onLocateBoundary={() => { setPublishOpen(false); if (boundary) focusNode(boundary.id); }} onClose={() => setPublishOpen(false)} onPublished={(id) => { setPublishOpen(false); window.parent.postMessage({ type: "hawk:published", executorId: id }, window.location.origin); }} /></Modal>)}
     {publishOpen && !lean && <Modal title="发布固定版本" onClose={() => setPublishOpen(false)}><p>发布将固定当前草稿内容，后续修改继续保留为草稿。</p><div className="p2-callout">当前草稿 {revision} · 基础检查通过</div><footer><Button variant="outline" onClick={() => setPublishOpen(false)}>返回编排</Button><Button onClick={() => { setPublishOpen(false); setNotice("发布服务尚未连接，当前草稿已保留"); }}>确认发布</Button></footer></Modal>}
   </div>;
 }

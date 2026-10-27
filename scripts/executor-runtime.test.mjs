@@ -179,3 +179,27 @@ test('configuration saves atomically, preserves locked input and rejects edits w
   const edited = R.configureExecutor(paused, 'test', { ...v, resource: 'tos://ignored/new.csv', count: 77 });
   assert.equal(edited.executors[0].inputCount, 100);
 });
+
+const { syncTrialInstances, trialVisible } = loadModule('../src/components/sites/hawk/data/trial-instances.ts');
+test('draft history summaries are scoped, deduplicated and removed with their owning history', () => {
+  const base = workspace();
+  const run = { id: 'trial-1', sequence: 1, phase: 'passed', createdAt: Date.now(), revision: 2, kept: false };
+  const first = syncTrialInstances(base, 'draft-a', 234, 'Draft A', [run]);
+  const second = syncTrialInstances(first, 'draft-b', 233, 'Draft B', [{ ...run, id: 'trial-2' }]);
+  assert.equal(second.trialRuns.length, 2);
+  assert.equal(syncTrialInstances(second, 'draft-b', 233, 'Draft B', [{ ...run, id: 'trial-2' }]), second);
+  const removed = syncTrialInstances(second, 'draft-a', 234, 'Draft A', []);
+  assert.deepEqual(removed.trialRuns.map(run => run.projectId), [233]);
+  assert.equal(syncTrialInstances(second, 'draft-a', 234, 'Draft A', [{ ...run, phase: 'invalid' }]), second);
+  assert.equal(syncTrialInstances(second, 'draft-a', 234, 'Draft A', [run, run]), second);
+  assert.equal(trialVisible({ ...run, createdAt: 0 }, 8 * 86400000), false);
+  assert.equal(trialVisible({ ...run, createdAt: 0, kept: true }, 8 * 86400000), true);
+  assert.equal(trialVisible({ ...run, createdAt: 0, phase: 'running' }, 8 * 86400000), true);
+});
+test('test executor purpose survives runtime creation and later state changes', () => {
+  const input = workspace(); input.executors[0].purpose = 'trial';
+  const initialized = R.initializeExecutor(input, 'test', {});
+  const started = R.changeExecutorState(R.setExecutorInput(initialized, 'test', 'tos://example/trial', 1), 'test', 'start');
+  assert.equal(started.executors[0].purpose, 'trial');
+  assert(started.batches.every(batch => batch.executorId === 'test'));
+});

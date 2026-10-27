@@ -9,7 +9,7 @@ type Group = { project: string; projectId?: number; drafts: Flow[] };
 type Workspace = { groups: Group[]; projects: { id: number; name: string }[]; executors: Record<string, unknown>[] };
 const key = 'annotation-demo.local-workspace.v1';
 type Publication = { name: string; parts: { name: string; description: string }[] };
-export function LocalPublish({ draftId, title, segments, onClose, onPublished, onLocateBoundary }: { draftId: string; title: string; segments?: { nodeIds: string[]; labels: string[] }[]; onClose: () => void; onPublished: (id?: string) => void; onLocateBoundary?: () => void }) {
+export function LocalPublish({ draftId, title, segments, purpose, onClose, onPublished, onLocateBoundary }: { draftId: string; title: string; purpose?: 'trial'; segments?: { nodeIds: string[]; labels: string[] }[]; onClose: () => void; onPublished: (id?: string) => void; onLocateBoundary?: () => void }) {
   const [name, setName] = useState(segments ? `${title}执行器` : title);
   const [parts, setParts] = useState((segments ?? [{ nodeIds: [], labels: [] }]).map((segment, index) => ({ ...segment, name: segments ? (segment.labels[0] || `工作流 ${index + 1}`) : title, description: '' })));
   const [error, setError] = useState('');
@@ -46,7 +46,7 @@ export function LocalPublish({ draftId, title, segments, onClose, onPublished, o
       flows.forEach((flow, index) => { flow.outputs = declaredOutputs(nextGraphs[index]); });
       const previous = flows.flatMap(flow => ['annotation-demo.graph.' + flow.id, flow.graphKey!].map(key => ({ key, value: localStorage.getItem(key) })));
       const executorId = segments ? `executor-${stamp}` : undefined;
-      if (executorId) workspace.executors.unshift({ id: executorId, projectId, name: publishName.trim(), description: publishParts.map(part => part.description).filter(Boolean).join('；'), source: 'canvas', flowIds: flows.map(flow => flow.id), flows, updatedAt: new Date().toISOString() });
+      if (executorId) workspace.executors.unshift({ id: executorId, projectId, purpose, sourceDraftId: draftId, name: publishName.trim(), description: publishParts.map(part => part.description).filter(Boolean).join('；'), source: 'canvas', flowIds: flows.map(flow => flow.id), flows, updatedAt: new Date().toISOString() });
       try {
         flows.forEach((flow, index) => {
           localStorage.setItem('annotation-demo.graph.' + flow.id, JSON.stringify(nextGraphs[index]));
@@ -76,9 +76,9 @@ export function LocalPublish({ draftId, title, segments, onClose, onPublished, o
       if (event.data.type === 'hawk:confirm-split-publish' && publication && typeof publication.name === 'string' && Array.isArray(publication.parts) && publication.parts.length === initialParts.length && publication.parts.every(part => typeof part.name === 'string' && typeof part.description === 'string')) handlers.current.publish(publication);
     };
     window.addEventListener('message', receive);
-    window.parent.postMessage({ type: 'hawk:request-split-publish', requestId, title, parts: initialParts.map(part => ({ name: part.name, description: part.description, labels: part.labels })) }, window.location.origin);
+    window.parent.postMessage({ type: 'hawk:request-split-publish', requestId, title, purpose, parts: initialParts.map(part => ({ name: part.name, description: part.description, labels: part.labels })) }, window.location.origin);
     return () => window.removeEventListener('message', receive);
-  }, [embedded, initialParts, requestId, title]);
+  }, [embedded, initialParts, requestId, title, purpose]);
   if (embedded) return null;
   return <div className="p2-local-publish">
     {segments && <div className="p2-callout warning"><strong>单工作流发布已阻断</strong><p>遍历 TOS 目录会产生多条后续输入，本案例需拆成 {parts.length} 条工作流。顺序来自当前画布，不能在此重新排序。</p><Button variant="outline" size="sm" onClick={onLocateBoundary}>定位阻断节点</Button></div>}
