@@ -1,5 +1,10 @@
 # 机器标注平台产品原型
 
+## 2026-11-03 · 批次与串联执行器导出
+
+结束按钮支持三档配置；运行中可按北京时间范围导出、查看进度与历史并重试。执行器支持统一排序配置、逐批次调整和下游文件依赖校验。详见 [体验入口、规则与运行方式](docs/delivery-export.md)。
+
+
 使用虚构、脱敏演示数据的前端交互原型。导航仅保留项目管理、算子地图和工作流编排。
 
 在线网页：<https://Isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/>
@@ -47,3 +52,9 @@ npm run audit:public -- --output
 ```
 
 输出目录为 `out/`。详情页采用查询参数承载项目/批次 ID，用户新建的本地记录也可在 GitHub Pages 刷新打开，不依赖后端动态路由。
+
+### 执行器二期整合原型（2026-11-03）
+
+需求与验证见 [需求总览](docs/executor-requirements-overview-20261103.md)、[执行器二期](docs/executor-phase2-20261103.md)、[批次共用能力](docs/export-feedback-20261103.md) 和 [验证记录](docs/executor-phase2-verification-20261103.md)。流式演示入口为 `/hawk/pipeline/executor/?id=phase2-demo&example=phase2`；成本收尾为 `id=phase2-cost`，零成品为 `id=phase2-zero`。示例只补充，不重置已有浏览器数据。
+
+浏览器复验脚本读取 `PLAYWRIGHT_MODULE`（默认 `playwright`）与可选 `CHROME_EXECUTABLE`，用于当前本机环境；截图采用合成数据和模型生成的场景状态。

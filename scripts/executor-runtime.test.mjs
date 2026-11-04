@@ -6,6 +6,8 @@ import { createRequire } from 'node:module';
 const loadModule = createRequire(import.meta.url);
 loadModule.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, filename);
 const R = loadModule('../src/components/sites/hawk/data/executor-runtime.ts');
+const { tickExportJobs, appendCompletedResults } = loadModule('../src/components/sites/hawk/data/delivery.ts');
+const release = w => { for (let i = 0; i < 8 && w.executors[0].runtime.currentIndex === 0; i++) w = R.tickExecutor(tickExportJobs(w), 'test'); return w; };
 const { publishedFlowId } = loadModule('../src/components/sites/hawk/data/mock-pipelines.ts');
 const { draftProjectId, normalizeProjectAssociations } = loadModule('../src/components/sites/hawk/data/workspace-projects.ts');
 const workspace = () => ({ groups: [], projects: [], batches: [], executors: [{ id: 'test', name: 'test', description: '', source: 'selection', projectId: 234, flowIds: ['a', 'b'], flows: [
@@ -77,9 +79,9 @@ test('pause freezes progress, resume continues and input cannot change after sta
 test('successor waits for export, then receives only its own predecessor output', () => {
   let w = R.changeExecutorState(prepared(), 'test', 'start');
   for (let i = 0; i < 5; i++) w = R.tickExecutor(w, 'test');
-  assert.equal(w.batches[0].status, '已完成'); assert.equal(w.batches[1].status, '初始化');
+  assert.equal(w.batches[0].status, '收尾中'); assert.equal(w.batches[1].status, '初始化');
   assert.equal(w.batches[1].inputResource, '');
-  w = R.tickExecutor(w, 'test');
+  w = release(w);
   assert.equal(w.batches[0].status, '已导出'); assert.equal(w.batches[1].status, '运行中');
   assert.equal(w.batches[1].inputResource, w.batches[0].deliveryResource);
   assert.equal(w.batches[1].total, 13); assert.equal(w.executors[0].runtime.currentIndex, 1);
@@ -87,7 +89,7 @@ test('successor waits for export, then receives only its own predecessor output'
 test('completion preserves batches and cannot start the same run twice', () => {
   let w = R.changeExecutorState(prepared(), 'test', 'start');
   assert.throws(() => R.changeExecutorState(w, 'test', 'start'));
-  for (let i = 0; i < 12; i++) w = R.tickExecutor(w, 'test');
+  for (let i = 0; i < 30; i++) w = R.tickExecutor(tickExportJobs(w), 'test');
   assert.equal(w.executors[0].runtime.state, 'completed');
   assert.ok(w.batches.every(batch => batch.status === '已导出'));
   assert.equal(R.tickExecutor(w, 'test'), w);
@@ -116,6 +118,7 @@ function finished(settings, counts = { total: 100, success: 90, failed: 10, filt
   w = R.changeExecutorState(w, 'test', 'start');
   Object.assign(w.batches[0], counts, { progress: 100, status: '部分失败' });
   w.batches[0].nodes.forEach(node => node.status = counts.failed ? '失败' : '已完成');
+  appendCompletedResults(w.batches[0]);
   return R.tickExecutor(w, 'test');
 }
 test('rigorous mode waits even at full success and manual confirmation gates export', () => {
@@ -125,7 +128,7 @@ test('rigorous mode waits even at full success and manual confirmation gates exp
   assert.equal(R.tickExecutor(w, 'test'), w);
   assert.equal(w.batches[1].inputResource, '');
   w = R.changeExecutorState(w, 'test', 'confirm');
-  w = R.tickExecutor(w, 'test');
+  w = release(w);
   assert.equal(w.batches[0].status, '已导出');
   assert.equal(w.batches[1].total, 100);
 });
@@ -145,7 +148,7 @@ test('target retries only failed rows, stops at target and releases successful o
   assert.equal(w.batches[0].success, 95); assert.equal(w.batches[0].failed, 5);
   assert.equal(w.executors[0].runtime.phase, 'exporting');
   assert.equal(w.executors[0].runtime.retryCounts[w.batches[0].id], 1);
-  w = R.tickExecutor(w, 'test');
+  w = release(w);
   assert.equal(w.batches[1].total, 95);
 });
 test('zero retries is honored and exhaustion choices block or release without another attempt', () => {
@@ -155,7 +158,7 @@ test('zero retries is honored and exhaustion choices block or release without an
   assert.equal(waiting.executors[0].runtime.retryCounts, undefined);
   let passing = finished({ mode: 'target', maxRetries: 0, afterRetries: 'continue' });
   assert.equal(passing.executors[0].runtime.phase, 'exporting');
-  passing = R.tickExecutor(passing, 'test'); assert.equal(passing.batches[1].total, 90);
+  passing = release(passing); assert.equal(passing.batches[1].total, 90);
 });
 test('retry exhaustion preserves counts, waits and retains configurable urgency across serialization', () => {
   let w = finished({ mode: 'target', targetRate: 100, maxRetries: 2, urgentReminder: false });

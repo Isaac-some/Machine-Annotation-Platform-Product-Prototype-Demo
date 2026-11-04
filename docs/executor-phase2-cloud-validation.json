@@ -1,0 +1,36 @@
+{
+  "documents": {
+    "phase2": {
+      "title": "执行器二期：流式运行、成本与复用",
+      "revision": 215,
+      "features": 14,
+      "imageBlocks": 17,
+      "nativeTableValidation": "pass",
+      "overviewBacklink": true
+    },
+    "shared": {
+      "title": "批次共用能力：重试、告警与交付导出",
+      "revision": 32,
+      "features": 16,
+      "imageBlocks": 20,
+      "nativeTableValidation": "pass",
+      "overviewBacklink": true
+    },
+    "overview": {
+      "title": "执行器与批次能力：需求总览",
+      "revision": 4,
+      "links": "pass"
+    },
+    "legacy": {
+      "title": "【历史，已迁移】工作流运行、重试与导出优化需求｜2026-10-22",
+      "revision": 242,
+      "links": "pass"
+    }
+  },
+  "errors": [],
+  "passed": true,
+  "imageSpotChecks": {
+    "retainedExportImage": "pixel-identical to retained local source",
+    "finalDrainingImage": "pixel-identical to final local screenshot"
+  }
+}

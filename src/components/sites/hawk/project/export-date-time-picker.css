@@ -1,0 +1,41 @@
+.hawk-export-date-trigger.ant-btn{display:flex;justify-content:flex-start;width:100%;min-width:0;height:38px;padding:7px 10px;border-radius:8px;font-size:12px;font-variant-numeric:tabular-nums;box-shadow:none}
+.hawk-export-date-trigger.is-empty{color:#94a3b8}
+.hawk-export-calendar-popover{z-index:1100;max-width:calc(100vw - 24px)}
+.hawk-export-calendar-popover .ant-popover-inner{padding:0;overflow:hidden;border:1px solid #e5eaf1;border-radius:12px;box-shadow:0 8px 28px #172b4d24}
+.hawk-export-calendar{width:516px;max-width:calc(100vw - 26px);max-height:calc(100dvh - 48px);overflow-y:auto;color:#111827}
+.hawk-export-calendar-main{display:grid;grid-template-columns:minmax(0,1fr) 192px}
+.hawk-export-calendar-days{min-width:0;padding:24px}
+.hawk-export-calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
+.hawk-export-calendar-nav strong{font-size:14px;font-weight:500}
+.hawk-export-calendar-nav .ant-btn{width:32px;height:32px;padding:0;border-radius:8px}
+.hawk-export-calendar .ant-picker-calendar-mini{width:100%}
+.hawk-export-calendar .ant-picker-calendar .ant-picker-panel{border-top:0}
+.hawk-export-calendar .ant-picker-content th{font-size:12px;font-weight:400;color:#64748b}
+.hawk-export-calendar .ant-picker-cell{padding:0}
+.hawk-export-calendar .ant-picker-cell .ant-picker-cell-inner{min-width:34px;height:36px;line-height:36px;border-radius:8px;font-size:13px;transition:background-color .15s,color .15s}
+.hawk-export-calendar-presets{display:grid;align-content:start;gap:8px;overflow-y:auto;max-height:326px;padding:24px;border-left:1px solid #e5eaf1;scrollbar-width:thin}
+.hawk-export-calendar-presets .ant-btn{height:36px;min-height:36px;width:100%;padding:8px 16px;border-radius:10px;box-shadow:none;font-size:14px;line-height:20px;font-weight:500}
+.hawk-export-calendar-footer{display:flex;align-items:center;flex-wrap:wrap;gap:16px;padding:20px 24px;border-top:1px solid #e5eaf1;background:#fff;position:sticky;bottom:0}
+.hawk-export-calendar-footer>div:first-child{display:grid;gap:8px;flex:1;min-width:180px}
+.hawk-export-calendar-footer>div:first-child>span{font-size:12px;color:#64748b}
+.hawk-export-calendar-footer label{display:flex;align-items:center;gap:10px;font-size:12px;white-space:nowrap}
+.hawk-export-calendar-footer input{width:132px;font-size:13px;padding:6px 8px;border-radius:8px}
+.hawk-export-calendar-footer-actions{display:flex;gap:8px;margin-left:auto}
+.hawk-export-calendar-footer-actions .ant-btn{height:34px;padding-inline:12px;border-radius:8px;font-size:12px;box-shadow:none}
+@media(max-width:767px){
+  .hawk-export-calendar{width:324px}
+  .hawk-export-calendar-main{grid-template-columns:minmax(0,1fr)}
+  .hawk-export-calendar-days{padding:16px}
+  .hawk-export-calendar-presets{grid-template-columns:repeat(3,minmax(0,1fr));max-height:132px;padding:12px 16px;border-left:0;border-top:1px solid #e5eaf1}
+  .hawk-export-calendar-presets .ant-btn{padding-inline:8px;font-size:13px}
+  .hawk-export-calendar-footer{padding:14px 16px;gap:12px}
+}
+@media(prefers-reduced-motion:reduce){.hawk-export-calendar .ant-picker-cell .ant-picker-cell-inner{transition:none}}
+
+.hawk-export-calendar .ant-picker-cell-selected .ant-picker-cell-inner:not(.is-chosen){background:transparent;color:inherit}
+.hawk-export-calendar .ant-picker-cell-inner.is-chosen{background:#1677ff;color:#fff}
+.hawk-export-calendar .ant-picker-cell:not(.ant-picker-cell-in-view){visibility:hidden}
+/* A tall calendar cannot anchor above/below its field on small viewports. */
+@media(max-width:767px),(max-height:700px){
+  .hawk-export-calendar-popover{position:fixed!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%)!important;margin:0}
+}

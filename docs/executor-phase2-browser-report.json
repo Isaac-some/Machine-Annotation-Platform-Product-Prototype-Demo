@@ -1,0 +1,43 @@
+{
+  "checks": [
+    "01-stream-configuration",
+    "02-sample",
+    "刷新保留样本暂停与费用",
+    "03-budget-wait",
+    "04-budget-confirm",
+    "05-production",
+    "06-recalculate",
+    "10-clone",
+    "07-draining",
+    "08-manual-review",
+    "09-recovery-scan",
+    "浏览器操作完成原位补救准备",
+    "11-zero-output",
+    "12-alarm",
+    "13-batch-retry",
+    "14-batch-scan",
+    "16-batch-configuration",
+    "17-retry-record",
+    "18-paused-nodes",
+    "19-finish-options",
+    "15-mobile-clone",
+    "390px 克隆主按钮可达",
+    "截图逐张检查：重算、克隆及窄屏弹窗等待布局稳定后重拍",
+    "暂停节点完成／暂停并列状态",
+    "三种结束方式下拉",
+    "390px 克隆创建按钮滚动可达",
+    "成本反馈保存不改变控制／运行状态",
+    "全局通知基准与事件强度预览",
+    "失败详情具体节点列",
+    "流式批次只保留暂停／恢复；环节暂停／恢复真实点击",
+    "刷新后保留全局暂停",
+    "390px 预算确认可操作",
+    "窄屏文档宽度 390 / 视口 390"
+  ],
+  "errors": [],
+  "resolvedFindings": [
+    "流式表格最小宽度撑宽页面已修复，390px复验页面无横向溢出",
+    "弹窗等待布局稳定后截图，已逐张核对",
+    "人工后续费用不改写已冻结的原预算收尾费用"
+  ]
+}

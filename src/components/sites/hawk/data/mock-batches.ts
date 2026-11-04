@@ -1,3 +1,6 @@
+import type { BatchRetry, AlarmState } from './batch-common';
+import type { DeliveryMode, ResultRecord } from './delivery';
+
 /**
  * 项目详情 · 批次列表与批次详情 mock 数据（全部虚构）
  */
@@ -5,6 +8,7 @@
 export type BatchStatus =
   | "初始化"
   | "运行中"
+  | "收尾中"
   | "已暂停"
   | "已完成"
   | "已导出"
@@ -15,6 +19,7 @@ export type BatchStatus =
 export const STATUS_PILL: Record<BatchStatus, { color: string; bg: string }> = {
   初始化: { color: "#8a94a6", bg: "#f5f5f5" },
   运行中: { color: "#1890ff", bg: "#e6f7ff" },
+  收尾中: { color: "#1677ff", bg: "#e6f4ff" },
   已暂停: { color: "#fa8c16", bg: "#fff7e6" },
   已完成: { color: "#45bb0c", bg: "#f2ffeb" },
   已导出: { color: "#45bb0c", bg: "#f2ffeb" },
@@ -24,6 +29,7 @@ export const STATUS_PILL: Record<BatchStatus, { color: string; bg: string }> = {
 
 /** 节点状态色（对齐源站 flowNode：已完成=绿 #42B724/#F3F8EF） */
 export const NODE_STATUS: Record<BatchNode["status"], { color: string; bg: string }> = {
+  已暂停: { color: "#fa8c16", bg: "#fff7e6" },
   待处理: { color: "#8a94a6", bg: "#f5f5f5" },
   处理中: { color: "#1890ff", bg: "#e6f4ff" },
   已完成: { color: "#42b724", bg: "#f3f8ef" },
@@ -33,11 +39,22 @@ export const NODE_STATUS: Record<BatchNode["status"], { color: string; bg: strin
 export interface BatchNode {
   seq: number;
   name: string;
-  status: "待处理" | "处理中" | "已完成" | "失败";
+  status: "待处理" | "处理中" | "已完成" | "失败" | "已暂停";
   cost: string; // ¥ - / ¥ 0.35
 }
 
 export interface BatchRow {
+  retryTask?: BatchRetry;
+  alarmDemo?: AlarmState;
+  alarmEnabled?: boolean;
+  alarmChannels?: Record<string, string>;
+  failureDetails?: { nodeSeq: number; errorCode: string; message: string; rowkey: string }[];
+  alarmGate?: { kind: 'percent' | 'count'; value: number };
+  deliveryMode?: DeliveryMode;
+  results?: ResultRecord[];
+  inputResults?: ResultRecord[];
+  simulation?: { legacySuccess?: number };
+  finish?: { mode: DeliveryMode; requestedAt: number; phase: 'draining' | 'exporting' | 'done'; inFlight: number; exportId?: string; note?: string };
   id: number;
   projectId: number;
   name: string;
@@ -187,6 +204,7 @@ export const WORKFLOW_OPTIONS = [
 ];
 
 export const BATCH_STATUS_COLOR: Record<BatchStatus, string> = {
+  收尾中: "processing",
   初始化: "default",
   运行中: "processing",
   已暂停: "warning",

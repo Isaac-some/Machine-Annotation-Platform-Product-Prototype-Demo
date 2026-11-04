@@ -6,8 +6,12 @@ import { useRouter } from "@/lib/demo-navigation";
 import { Alert, Breadcrumb, Button, Form, Input, InputNumber, message, Modal, Popover, Select, Space, Switch, Table, Tooltip, Typography } from "antd";
 import { CaretRightOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, ExpandOutlined, MinusOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, RedoOutlined, RightOutlined, StopOutlined } from "@ant-design/icons";
 import { NODE_STATUS, STATUS_PILL, type BatchNode, type BatchRow, type BatchStatus, type BatchSystemConfig } from "../data/mock-batches";
-import { useWorkspace, writeWorkspace } from "../data/local-workspace";
+import { readWorkspace, useWorkspace, writeWorkspace } from "../data/local-workspace";
+import { BatchDeliveryStatus, DeliveryControls, FinishControl, downloadDelivery } from './delivery-controls';
+import { withDeliveryExamples } from '../data/delivery-examples';
+import { enableSimulation, finishStandaloneBatch } from '../data/workspace-runtime';
 import "./batch-detail.css";
+import { prepareBatchRetry } from '../data/batch-common';
 
 const FIELD_OPTIONS = ["dir", "tos_path", "ext", "rowkey"];
 const DEFAULT_CONFIG: BatchSystemConfig = {
@@ -28,7 +32,7 @@ function FlowNodeCard({ node, onCost, onRetry, retryEnabled = true }: { node: Ba
       <span className="hawk-batch-node-name" title={node.name}>{node.name}</span>
       <div className="hawk-batch-node-status">
         <span style={{ color: status.color, background: status.bg }}>{node.status}</span>
-        <Button type="text" size="small" disabled={!retryEnabled || node.status !== "失败"} icon={<RedoOutlined />} onClick={onRetry}>重试</Button>
+        <Button type="text" size="small" disabled={!retryEnabled} icon={<RedoOutlined />} onClick={onRetry}>重试</Button>
       </div>
     </div>
     <div className="hawk-batch-node-cost"><strong>{node.cost}</strong><Button type="link" size="small" onClick={onCost}>成本详情</Button></div>
@@ -41,16 +45,23 @@ export function BatchDetailPage() {
   const params = { id: query.get("id") ?? "234", batchId: query.get("batchId") ?? "" };
   const router = useRouter();
   const projectId = Number(params.id), batchId = Number(params.batchId);
+  const showExample = query.get('example') === 'delivery';
+  useEffect(() => {
+    if (!showExample) return;
+    const current = readWorkspace(), next = withDeliveryExamples(current);
+    if (next !== current) writeWorkspace(next);
+  }, [showExample]);
   const batch = workspace.batches.find(item => item.id === batchId && item.projectId === projectId);
   if (!batch) return <div style={{ padding: 24 }}>批次不存在（本地项目：{params.id}，批次：{params.batchId}）</div>;
   const workbench = () => router.push('/hawk/pipeline/executor?id=' + encodeURIComponent(batch.executorId!));
   return <>{batch.executorId && <Alert type="info" message="此批次由执行器统一调度，前往工作台操作运行和输入。" action={<Button onClick={workbench}>打开执行器</Button>} />}<BatchDetailPanel key={batch.id} batch={batch} projectName={workspace.projects.find(item => item.id === projectId)?.name ?? '-'}
-    execution={batch.executorId ? { inputSource: batch.inputFromBatchId ? `来自本执行器 Batch ${batch.inputFromBatchId}` : '本次输入', waiting: !batch.inputResource, canAction: () => false, onAction: workbench, onEditInput: workbench, inputEditable: false } : undefined}
-    onUpdate={patch => writeWorkspace({ ...workspace, batches: workspace.batches.map(item => item.id === batch.id ? { ...item, ...patch } : item) })}
+    execution={batch.executorId ? { runMode: workspace.executors.find(e => e.id === batch.executorId)?.runMode, inputSource: batch.inputFromBatchId ? `来自本执行器 Batch ${batch.inputFromBatchId}` : '本次输入', waiting: !batch.inputResource, canAction: () => false, onAction: workbench, onEditInput: workbench, inputEditable: false } : undefined}
+    onUpdate={patch => { const current = readWorkspace(); writeWorkspace({ ...current, batches: current.batches.map(item => item.id === batch.id ? { ...item, ...patch } : item) }); }}
     breadcrumb={<Breadcrumb items={[{ title: <a onClick={() => router.push('/hawk/project')}>项目管理</a> }, { title: <a onClick={() => router.push('/hawk/project/detail/' + projectId)}>项目详情</a> }, { title: '批次详情' }]} />} /></>;
 }
 
 export interface BatchExecutionContext {
+  runMode?: 'batch' | 'stream';
   inputSource: string;
   showInputSource?: boolean;
   waiting: boolean;
@@ -131,6 +142,10 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     try { await navigator.clipboard.writeText(value); msg.success("已复制"); } catch { msg.error("复制失败，请选择资源文字复制"); }
   };
   const download = (kind: string) => {
+    if (kind === 'delivery') {
+      const job = readWorkspace().exportJobs?.find(item => item.resource === batch.deliveryResource && item.status === 'succeeded');
+      if (job) { downloadDelivery(job); return; }
+    }
     const data = { localPrototype: true, exportedAt: new Date().toISOString(), kind, batchId: batch.id, batchName: batch.name,
       inputResource: batch.inputResource, deliveryResource: batch.deliveryResource ?? null, status: batch.status,
       failed: batch.failed, filtered: batch.filtered, outputFields: batch.outputFields ?? [] };
@@ -140,15 +155,22 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
   };
   const changeStatus = (status: BatchStatus, action: string) => {
     if (execution) { execution.onAction(action); return; }
-    if (!updateBatch({ status, updatedAt: new Date().toLocaleString("sv-SE") })) return;
-    msg.info("本地演示：已" + action + "，未提交后台执行");
+    try {
+      if (action === '结束') { writeWorkspace(finishStandaloneBatch(readWorkspace(), batch.id)); return; }
+      const target = { ...batch, nodes: batch.nodes.map(node => ({ ...node, status: action === '暂停' && node.status !== '已完成' ? '已暂停' as const : node.status })), status, updatedAt: new Date().toISOString() };
+      if (action === '开始' || action === '启动' || action === '重试') {
+        enableSimulation(target);
+        if (target.total < 1) { msg.warning('请先配置有效的输入数量'); return; }
+      }
+      updateBatch(target);
+    } catch (error) { msg.error(error instanceof Error ? error.message : '操作失败，请重试'); }
   };
   const actions = [
     { title: "开始", icon: <PlayCircleOutlined />, enabled: batch.status === "初始化", status: "运行中" },
     { title: "暂停", icon: <PauseCircleOutlined />, enabled: batch.status === "运行中", status: "已暂停" },
     { title: "启动", icon: <PlayCircleOutlined />, enabled: batch.status === "已暂停", status: "运行中" },
-    { title: "结束", icon: <StopOutlined />, enabled: ["运行中", "已暂停", "部分失败"].includes(batch.status), status: "已结束" },
-    { title: "重试", icon: <RedoOutlined />, enabled: ["部分失败", "已结束"].includes(batch.status), status: "运行中" },
+    { title: "结束", icon: <StopOutlined />, enabled: !batch.finish && ["运行中", "已暂停", "部分失败", "已完成"].includes(batch.status), status: "已结束" },
+    { title: "重试", icon: <RedoOutlined />, enabled: !batch.finish && ["部分失败", "已结束"].includes(batch.status), status: "运行中" },
   ] as const;
   const costNode = typeof costTarget === "number" ? batch.nodes.find(node => node.seq === costTarget) : undefined;
   const costRows = typeof costTarget === "number" ? batch.nodeCostResources?.[costTarget] ?? [] : batch.costResources ?? [];
@@ -174,7 +196,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
       </div>
       <div className="hawk-batch-header-bottom">
         <div className="hawk-batch-progress">{[[batch.success, "#52c41a"], [batch.filtered, "#faad14"], [batch.failed, "#ff4d4f"]].map(([value, color]) => <span key={color} style={{ background: color as string, width: batch.total > 0 ? Math.max(0, Number(value)) / batch.total * 100 + "%" : "0%" }} />)}</div>
-        <Space size={14} wrap>{actions.map(action => <Button key={action.title} type="text" size="small" icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
+        <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
       </div>
     </div>
     <div className="hawk-batch-graph" ref={graphRef} onPointerDown={event => {
@@ -191,7 +213,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
           const d = sameRow ? "M" + startX + " " + startY + " H" + endX : "M" + startX + " " + startY + " V" + (startY + 40) + " H" + endX + " V" + endY;
           return <g key={node.seq}><path d={d} fill="none" stroke="#475569" strokeWidth="1.4" strokeDasharray="4 4" strokeLinejoin="round" /><circle cx={startX} cy={startY} r={4.5} fill="#334155" /><circle cx={endX} cy={endY} r={4.5} fill="#334155" /></g>;
         })}</svg>
-        {batch.nodes.map((node, index) => <div key={node.seq} style={{ position: "absolute", left: position(index).x, top: position(index).y }}><FlowNodeCard node={node} retryEnabled={!execution} onCost={() => setCostTarget(node.seq)} onRetry={() => { if (updateBatch({ nodes: batch.nodes.map(item => item.seq === node.seq ? { ...item, status: "处理中" } : item) })) msg.info("本地演示：节点已设为处理中，未提交后台重试"); }} /></div>)}
+        {batch.nodes.map((node, index) => <div key={node.seq} style={{ position: "absolute", left: position(index).x, top: position(index).y }}><FlowNodeCard node={node} retryEnabled={!execution && !batch.finish && batch.failed > 0 && ["已暂停", "部分失败"].includes(batch.status)} onCost={() => setCostTarget(node.seq)} onRetry={() => { try { const w = readWorkspace(), current = w.batches.find(b => b.id === batch.id)!; const target = prepareBatchRetry(current, node.seq); writeWorkspace({ ...w, batches: w.batches.map(b => b.id === batch.id ? target : b) }); } catch (e) { msg.error(e instanceof Error ? e.message : "重试准备失败"); } }} /></div>)}
       </div>
       <div className="hawk-batch-zoom"><Button aria-label="缩小画布" type="text" size="small" icon={<MinusOutlined />} onClick={() => zoom(scale - 0.1)} /><span>{Math.round(scale * 100)}%</span><Button aria-label="放大画布" type="text" size="small" icon={<PlusOutlined />} onClick={() => zoom(scale + 0.1)} /><Button aria-label="适应画布" type="text" size="small" icon={<ExpandOutlined />} onClick={fitView} /></div>
       <button className="hawk-batch-minimap" aria-label="小地图：适应画布" onClick={fitView}><svg viewBox={"-30 -30 " + (graphWidth + 60) + " " + (graphHeight + 60)}>{batch.nodes.map((node, index) => <rect key={node.seq} x={position(index).x} y={position(index).y} width={NODE_W} height={NODE_H} rx={8} fill="#fff" stroke="#cbd5e1" strokeWidth={4} />)}<rect x={-offset.x / scale} y={-offset.y / scale} width={viewport.width / scale} height={viewport.height / scale} fill="none" stroke="#91caff" strokeWidth={3} /></svg></button>
@@ -199,9 +221,10 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     {execution && execution.showInputSource !== false && <div className="hawk-batch-binding"><span>输入来源：{execution.inputSource}</span><span>{execution.waiting ? '等待前置批次产出，当前批次不可提前启动' : '按执行器固定关系接续'}</span></div>}
     <div className="hawk-batch-resources">
       <div className="hawk-batch-resource-input"><span>输入资源</span><Typography.Text ellipsis={{ tooltip: batch.inputResource }}>{batch.inputResource || (execution?.waiting ? '等待前置批次产出' : execution ? '待配置输入' : '-')}</Typography.Text><Tooltip title="复制输入资源"><Button aria-label="复制输入资源" type="text" size="small" icon={<CopyOutlined />} disabled={!batch.inputResource} onClick={() => copy(batch.inputResource)} /></Tooltip><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出输入资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("input")} /></Tooltip><Button aria-label="编辑输入资源" type="text" size="small" icon={<EditOutlined />} disabled={Boolean(execution && !execution.inputEditable)} onClick={() => { if (execution) { execution.onEditInput(); return; } setInputValue(batch.inputResource); setInputOpen(true); }} /></div>
-      <div className="hawk-batch-resource-delivery"><span>交付文件</span><Typography.Text ellipsis={{ tooltip: batch.deliveryResource }}>{batch.deliveryResource || "-"}</Typography.Text>{batch.deliveryResource && <><Button aria-label="复制交付资源" type="text" size="small" icon={<CopyOutlined />} onClick={() => copy(batch.deliveryResource!)} /><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出交付资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("delivery")} /></Tooltip></>}</div>
+      <div className="hawk-batch-resource-delivery"><span>交付文件</span><Typography.Text ellipsis={{ tooltip: batch.deliveryResource }}>{batch.deliveryResource || "-"}</Typography.Text>{batch.deliveryResource && <><Button aria-label="复制交付资源" type="text" size="small" icon={<CopyOutlined />} onClick={() => copy(batch.deliveryResource!)} /><Tooltip title="下载交付文件；旧资源仅提供原有元数据"><Button aria-label="下载交付文件" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("delivery")} /></Tooltip></>}<DeliveryControls batchId={batch.id} /></div>
       <Tooltip title="导出本地失败及过滤数量元数据，不包含后台记录"><Button className="hawk-batch-resource-failed" onClick={() => download("failed-filtered")}>失败&amp;被过滤记录</Button></Tooltip>
     </div>
+    <BatchDeliveryStatus batchId={batch.id} />
     <Modal title="输出字段" open={fieldsOpen} width={560} okText="保 存" cancelText="取 消" onCancel={() => setFieldsOpen(false)} onOk={() => { if (draftFields.some(value => !value)) { msg.warning("请选择输出字段或删除空行"); return; } if (!updateBatch({ outputFields: draftFields as string[] })) return; setFieldsOpen(false); msg.success("输出字段已保存到本机"); }}>
       <Typography.Text type="secondary">共 {draftFields.length} 项</Typography.Text>
       <div className="hawk-batch-fields">{draftFields.map((field, index) => <div key={index}><Select aria-label={"输出字段 " + (index + 1)} showSearch value={field} placeholder="请选择输出字段" options={availableFields.filter(value => value === field || !draftFields.includes(value)).map(value => ({ value, label: value }))} onChange={value => setDraftFields(previous => previous.map((item, i) => i === index ? value : item))} /><Button aria-label={"删除输出字段 " + (index + 1)} danger type="text" icon={<DeleteOutlined />} onClick={() => setDraftFields(previous => previous.filter((_, i) => i !== index))} /></div>)}</div>

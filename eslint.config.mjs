@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Openhandle 独立子项目（自带 lint），以及所有静态构建产物
     "openhandle/**",
     "public/**",
+    // Browser verification downloads and generated bundles are artifacts, not source.
+    "verification/**",
   ]),
 ]);
 

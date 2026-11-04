@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { Alert } from 'antd';
+import { useWorkspaceRuntime } from '@/components/sites/hawk/data/use-workspace-runtime';
 import "@ant-design/v5-patch-for-react-19";
 
 // ProLayout 依赖 window 计算（断点/尺寸），SSR 属性必然不匹配；
@@ -11,5 +13,6 @@ const HawkShell = dynamic(() => import("@/components/sites/hawk/hawk-shell").the
 });
 
 export function HawkShellClient({ children }: { children: React.ReactNode }) {
-  return <HawkShell>{children}</HawkShell>;
+  const runtimeError = useWorkspaceRuntime();
+  return <HawkShell>{runtimeError && <Alert type="error" role="alert" message={runtimeError} />}{children}</HawkShell>;
 }

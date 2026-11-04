@@ -1,0 +1,129 @@
+/* Adapted from the three settings references; retains the Hawk palette and controls. */
+.ant-modal.hawk-settings-modal {
+  --settings-ink: #111827;
+  --settings-muted: #64748b;
+  --settings-border: #e5eaf1;
+  --settings-ground: #f8fafc;
+  --settings-accent: #1677ff;
+  color: var(--settings-ink);
+  max-width: calc(100vw - 32px);
+  padding-bottom: 0;
+}
+.hawk-settings-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--settings-border);
+  border-radius: 14px;
+  box-shadow: 0 16px 56px #172b4d24;
+}
+.hawk-settings-modal .ant-modal-header {
+  flex: none;
+  margin: 0;
+  padding: 22px 24px 20px;
+  border-bottom: 1px solid var(--settings-border);
+}
+.hawk-settings-modal .ant-modal-close { top: 18px; inset-inline-end: 18px; }
+.hawk-settings-heading { padding-right: 24px; }
+.hawk-settings-heading > span { font-size: 18px; font-weight: 600; line-height: 26px; color: var(--settings-ink); }
+.hawk-settings-heading > p { margin: 5px 0 0; font-size: 12px; font-weight: 400; line-height: 20px; color: var(--settings-muted); }
+.hawk-settings-modal .ant-modal-body { min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain; padding: 0 24px; }
+.hawk-settings-modal .ant-modal-footer {
+  flex: none;
+  margin: 0;
+  padding: 16px 24px;
+  background: var(--settings-ground);
+  border-top: 1px solid var(--settings-border);
+}
+.hawk-settings-modal .ant-modal-footer .ant-btn { height: 36px; min-width: 76px; padding-inline: 16px; border-radius: 8px; box-shadow: none; font-size: 13px; }
+.hawk-settings-modal .ant-modal-footer .ant-btn + .ant-btn { margin-inline-start: 8px; }
+.hawk-settings-modal .hawk-settings-section { margin: 0; padding: 20px 0; border-top: 1px solid var(--settings-border); }
+.hawk-settings-modal .hawk-settings-section:first-child { border-top: 0; }
+.hawk-settings-section-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.hawk-settings-modal .hawk-settings-section-heading h3 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--settings-ink); font-size: 14px; font-weight: 600; line-height: 22px; }
+.hawk-settings-section-heading h3 .anticon { color: var(--settings-muted); font-size: 15px; }
+.hawk-settings-section-heading > p, .hawk-settings-section-heading > span { margin: 0; color: var(--settings-muted); font-size: 12px; line-height: 20px; }
+.hawk-settings-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: start; gap: 24px; padding: 16px 0; }
+.hawk-settings-row-label strong { display: block; color: var(--settings-ink); font-size: 13px; font-weight: 500; line-height: 22px; }
+.hawk-settings-row-label p { margin: 4px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 20px; }
+.hawk-settings-modal .ant-input, .hawk-settings-modal .ant-input-number { min-height: 36px; border-radius: 8px; font-size: 13px; }
+.hawk-settings-modal .ant-input-number-input { height: 34px; }
+.hawk-settings-modal .ant-select { min-height: 36px; font-size: 13px; }
+.hawk-settings-modal .ant-select-selector { border-radius: 8px; }
+.hawk-settings-modal .ant-form-item-label > label { color: var(--settings-ink); font-size: 13px; }
+.hawk-settings-modal .ant-typography-secondary { color: var(--settings-muted); font-size: 12px; line-height: 20px; }
+.hawk-settings-modal .ant-alert { font-size: 12px; }
+
+/* Both file-order controls use the same joined, icon-labelled options. */
+.hawk-order-switch { display: inline-flex; width: fit-content; max-width: 100%; padding: 3px; background: #f5f7fa; border: 1px solid #e5eaf1; border-radius: 9px; }
+.hawk-order-switch .ant-radio-button-wrapper { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 6px !important; background: transparent; color: #64748b; font-size: 13px; line-height: 28px; white-space: nowrap; transition: color .15s, background-color .15s, border-color .15s; }
+.hawk-order-switch .ant-radio-button-wrapper::before { display: none !important; }
+.hawk-order-switch .ant-radio-button-wrapper > span:last-child > span { display: inline-flex; align-items: center; gap: 7px; }
+.hawk-order-switch .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) { color: #1677ff; background: #fff; border-color: #d5dfee; box-shadow: none; }
+.hawk-order-switch .ant-radio-button-wrapper:hover { color: #1677ff; }
+.hawk-order-switch .ant-radio-button-wrapper:focus-within { outline: 2px solid #91caff; outline-offset: 1px; }
+.hawk-executor-delivery-setting > .hawk-order-switch { align-self: flex-start; }
+.hawk-executor-delivery-setting > small { color: #64748b; font-size: 12px; line-height: 20px; }
+
+.hawk-settings-modal .hawk-export-form { display: flex; flex-direction: column; gap: 0; padding: 0 0 20px; }
+.hawk-settings-modal .hawk-export-origin > label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 500; }
+.hawk-settings-modal .hawk-export-source { padding: 12px 14px; gap: 4px; border: 1px solid var(--settings-border); border-radius: 8px; background: var(--settings-ground); }
+.hawk-settings-modal .hawk-export-origin > label + .hawk-export-source { margin-top: 12px; }
+.hawk-settings-modal .hawk-export-source strong { font-size: 13px; font-weight: 500; line-height: 22px; overflow-wrap: anywhere; }
+.hawk-settings-modal .hawk-export-source span { color: var(--settings-muted); line-height: 20px; }
+.hawk-export-range-switch { display: flex; width: 100%; }
+.hawk-export-range-switch .ant-radio-button-wrapper { flex: 1; height: 36px; padding: 0 8px; border-color: #d5dfee; text-align: center; line-height: 34px; font-size: 13px; white-space: nowrap; }
+.hawk-export-range-switch .ant-radio-button-wrapper:first-child { border-radius: 8px 0 0 8px; }
+.hawk-export-range-switch .ant-radio-button-wrapper:last-child { border-radius: 0 8px 8px 0; }
+.hawk-export-range-switch .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) { color: var(--settings-accent); background: #f0f6ff; box-shadow: none; }
+.hawk-settings-modal .hawk-export-help { margin-top: 10px; color: var(--settings-muted); line-height: 20px; }
+.hawk-settings-modal .hawk-export-times { margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hawk-settings-modal .hawk-export-times > label { gap: 8px; font-size: 12px; }
+.hawk-settings-modal .hawk-export-times input { width: 100%; min-width: 0; padding-inline: 10px; }
+.hawk-settings-modal .hawk-export-order-section { padding: 0; }
+.hawk-export-order-section .hawk-order-switch { justify-self: end; }
+.hawk-settings-modal .hawk-export-preview { margin-top: 0; padding: 14px 16px; border: 1px solid #dbe6f7; border-radius: 9px; background: #f5f9ff; }
+.hawk-settings-modal .hawk-export-preview strong { color: #1677ff; font-size: 24px; font-weight: 600; line-height: 30px; }
+.hawk-settings-modal .hawk-export-preview > span { color: #334155; font-size: 13px; }
+.hawk-settings-modal .hawk-export-preview p { color: var(--settings-muted); font-size: 12px; line-height: 20px; }
+.hawk-settings-modal .hawk-export-form > .ant-alert { margin-top: 12px; }
+
+@media (max-width: 640px) {
+  .hawk-settings-modal .ant-modal-header { padding: 18px 16px 16px; }
+  .hawk-settings-modal .ant-modal-body { padding-inline: 16px; }
+  .hawk-settings-modal .ant-modal-footer { padding: 14px 16px; }
+  .hawk-settings-modal .ant-modal-close { inset-inline-end: 12px; top: 14px; }
+  .hawk-settings-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .hawk-export-order-section .hawk-order-switch { justify-self: start; }
+  .hawk-settings-modal .hawk-export-times { grid-template-columns: minmax(0, 1fr); }
+  .hawk-settings-modal .hawk-export-times .ant-input { min-height: 40px; }
+  .hawk-order-switch .ant-radio-button-wrapper { height: 36px; line-height: 34px; }
+}
+@media (prefers-reduced-motion: reduce) { .hawk-order-switch .ant-radio-button-wrapper { transition: none; } }
+
+.hawk-delivery-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.hawk-executor-delivery-setting .hawk-delivery-actions .ant-btn{height:34px;padding-inline:10px;border-radius:8px}
+.hawk-export-time-mode{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.hawk-export-relative{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;font-size:13px}
+.hawk-export-relative .ant-input-number{width:96px}
+.hawk-export-relative .ant-select{width:90px}
+.hawk-export-relative p{width:100%;margin:0;font-size:12px;color:#64748b;line-height:22px}
+.hawk-export-relative .ant-btn{padding-inline:8px}
+.hawk-export-timeline{margin-top:18px;padding:14px;border:1px solid #e5eaf1;border-radius:8px;background:#f8fafc;font-size:12px;color:#64748b}
+.hawk-export-timeline-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.hawk-export-timeline-heading strong{color:#334155;font-weight:500}
+.hawk-export-timeline-heading>span{display:flex;align-items:center;gap:6px;font-size:11px}
+.hawk-export-timeline-heading i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:6px}
+.hawk-export-timeline .is-delivered{background:#a7c4eb}
+.hawk-export-timeline .is-selected{background:#1677ff}
+.hawk-export-timeline-track{height:8px;background:#e9edf3;border-radius:4px;position:relative;margin-top:6px;overflow:hidden}
+.hawk-export-timeline-track>span{position:absolute;height:100%;border-radius:4px}
+.hawk-export-timeline-labels{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:10px;font-variant-numeric:tabular-nums}
+.hawk-export-timeline-labels>span:last-child{text-align:right}
+.hawk-export-timeline p{margin:10px 0 0;line-height:20px;overflow-wrap:anywhere}
+.hawk-export-timeline details{margin-top:12px}
+.hawk-export-timeline summary{cursor:pointer;color:#1677ff}
+.hawk-export-continuation{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:11px;color:#64748b}
+.hawk-export-continuation .ant-btn{height:auto;min-height:32px;padding:5px 10px;white-space:normal}

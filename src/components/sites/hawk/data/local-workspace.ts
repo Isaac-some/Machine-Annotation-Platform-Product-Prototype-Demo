@@ -5,8 +5,17 @@ import { BATCHES, type BatchRow } from './mock-batches';
 import type { TrialInstance } from './trial-instances';
 import type { ExecutorSettings } from './executor-settings';
 import { normalizeProjectAssociations } from './workspace-projects';
+import type { DeliveryMode, ExportJob } from './delivery';
+import type { StreamPolicy, StreamRun } from './executor-streaming';
 
 export interface LocalExecutor {
+  runMode?: 'batch' | 'stream';
+  streamPolicy?: StreamPolicy;
+  stream?: StreamRun;
+  clonedFrom?: string;
+  notification?: { baseline: number; reminder: number; stop: number; recipients: string };
+  costFeedback?: { kind: 'accuracy' | 'missed'; eventId?: string; batchId?: number; text: string; at: number }[];
+  deliveryMode?: Exclude<DeliveryMode, 'none'>;
   id: string; name: string; description: string; projectId?: number;
   purpose?: 'trial'; sourceDraftId?: string;
   source: 'selection' | 'canvas'; flowIds: string[]; flows: PipelineDraft[];
@@ -26,7 +35,7 @@ export interface LocalExecutor {
     urgent?: boolean;
   };
 }
-export interface LocalWorkspace { trialRuns?: TrialInstance[]; groups: PipelineGroup[]; executors: LocalExecutor[]; projects: ProjectRow[]; batches: BatchRow[]; }
+export interface LocalWorkspace { lastSimulationTick?: number; exportJobs?: ExportJob[]; trialRuns?: TrialInstance[]; groups: PipelineGroup[]; executors: LocalExecutor[]; projects: ProjectRow[]; batches: BatchRow[]; }
 export const WORKSPACE_KEY = 'annotation-demo.local-workspace.v1';
 export const WORKSPACE_EVENT = 'hawk-workspace-change';
 const initialWorkspace = (): LocalWorkspace => ({ groups: PIPELINE_GROUPS, executors: [], projects: PROJECTS, batches: BATCHES });

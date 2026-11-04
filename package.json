@@ -33,7 +33,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run build",
     "build:editor": "node scripts/build-editor.mjs",
-    "test": "node --test scripts/executor-runtime.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "audit:public": "node scripts/audit-public.mjs"
   },
   "dependencies": {
@@ -45,6 +45,7 @@
     "antd": "^5.29.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dayjs": "^1.11.23",
     "lucide-react": "^1.6.0",
     "next": "16.3.5",
     "react": "19.2.4",

@@ -18,7 +18,7 @@ export function ProjectExecutors({ projectId }: { projectId: number }) {
     { title: '执行器名称', width: 220, render: (_, executor) => <><Typography.Text strong>{executor.name}</Typography.Text><div><Typography.Text type="secondary" style={{ fontSize: 11 }}>{executor.id}</Typography.Text></div></> },
     { title: '执行顺序', width: 320, render: (_, executor) => <span title={executor.flows.map(flow => flow.name).join(' → ')}>{executor.flows.map(flow => flow.name).join(' → ')}</span> },
     { title: '状态', width: 120, render: (_, executor) => <Tag color={executor.runtime?.state === 'running' ? 'processing' : executor.runtime?.state === 'completed' ? 'success' : executor.runtime?.state === 'waiting' ? 'warning' : 'default'}>{states[executor.runtime?.state ?? 'ready']}</Tag> },
-    { title: '执行模式', width: 100, render: (_, executor) => ({ default: '默认', rigorous: '严谨', target: '目标' })[executorSettings(executor.settings).mode] },
+    { title: '执行模式', width: 100, render: (_, executor) => executor.runMode === 'stream' ? '流式' : ({ default: '默认', rigorous: '严谨', target: '目标' })[executorSettings(executor.settings).mode] },
     { title: '运行进度', width: 170, render: (_, executor) => {
       const completed = workspace.batches.filter(batch => batch.executorId === executor.id && batch.status === '已导出').length;
       return <Space direction="vertical" size={0}><span>{completed} / {executor.flows.length} 已完成</span>{executor.runtime?.started && !['completed', 'ended'].includes(executor.runtime.state) && <Typography.Text type="secondary" style={{ fontSize: 11 }}>当前第 {executor.runtime.currentIndex + 1} 步</Typography.Text>}</Space>;
