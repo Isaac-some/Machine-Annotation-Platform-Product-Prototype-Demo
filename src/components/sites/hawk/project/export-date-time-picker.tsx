@@ -14,12 +14,13 @@ const slots = Array.from({ length: 37 }, (_, index) => {
 });
 const displayDate = (value: number) => dayjs(beijingTime(value)).millisecond(value % 1000);
 
-export function ExportDateTimePicker({ value, onChange, label, placeholder }: { value: number | null; onChange: (value: number | null) => void; label: string; placeholder: string }) {
+export function ExportDateTimePicker({ value, onChange, label, placeholder, disabled = false }: { value: number | null; onChange: (value: number | null) => void; label: string; placeholder: string; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Dayjs | null>(null);
   const [month, setMonth] = useState<Dayjs | null>(null);
   const [time, setTime] = useState('09:00:00');
   const changeOpen = (next: boolean) => {
+    if (disabled && next) return;
     if (next) {
       const date = displayDate(value ?? Date.now());
       setDraft(date); setMonth(date); setTime(value === null ? '09:00:00' : date.format('HH:mm:ss'));
@@ -41,7 +42,7 @@ export function ExportDateTimePicker({ value, onChange, label, placeholder }: { 
       <div className="hawk-export-calendar-footer-actions"><Button onClick={() => { onChange(null); setOpen(false); }}>清空</Button><Button type="primary" disabled={!draft || !validTime} onClick={() => { onChange(Date.parse(`${draft!.format('YYYY-MM-DD')}T${time.length === 5 ? `${time}:00` : time}+08:00`)); setOpen(false); }}>确认时间</Button></div>
     </div>
   </div>;
-  return <Popover open={open} onOpenChange={changeOpen} content={content} trigger="click" placement="bottomLeft" arrow={false} classNames={{ root: 'hawk-export-calendar-popover' }} autoAdjustOverflow>
-    <Button className={`hawk-export-date-trigger${value === null ? ' is-empty' : ''}`} aria-label={label} aria-expanded={open} icon={<CalendarOutlined />}>{value === null ? placeholder : beijingTime(value)}</Button>
+  return <Popover open={open && !disabled} onOpenChange={changeOpen} content={content} trigger="click" placement="bottomLeft" arrow={false} classNames={{ root: 'hawk-export-calendar-popover' }} autoAdjustOverflow>
+    <Button className={`hawk-export-date-trigger${value === null ? ' is-empty' : ''}`} aria-label={label} aria-expanded={open && !disabled} disabled={disabled} icon={<CalendarOutlined />}>{value === null ? placeholder : beijingTime(value)}</Button>
   </Popover>;
 }

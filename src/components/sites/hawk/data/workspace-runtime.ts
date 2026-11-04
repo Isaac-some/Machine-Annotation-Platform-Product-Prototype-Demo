@@ -16,9 +16,9 @@ export function finishStandaloneBatch(workspace: LocalWorkspace, batchId: number
   const next = cloneWorkspace(workspace), target = next.batches.find(item => item.id === batchId)!;
   enableSimulation(target); beginBatchFinish(next, batchId, now); return next;
 }
-export function tickWorkspace(workspace: LocalWorkspace, now = Date.now()): LocalWorkspace {
+export function tickWorkspace(workspace: LocalWorkspace, now = Date.now(), observedProcessingMs = 0): LocalWorkspace {
   let next = tickExportJobs(workspace, now);
-  for (const executor of next.executors) next = tickExecutor(next, executor.id);
+  for (const executor of next.executors) next = tickExecutor(next, executor.id, observedProcessingMs, now);
   const batches = next.batches.filter(batch => !batch.executorId && (batch.retryTask && batch.retryTask.phase !== 'done' || batch.finish && batch.finish.phase !== 'done' || batch.simulation && batch.status === '运行中'));
   if (!batches.length) return next;
   next = cloneWorkspace(next);

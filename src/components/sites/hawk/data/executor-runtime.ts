@@ -75,7 +75,7 @@ export function configureExecutor(workspace: LocalWorkspace, id: string, input: 
   validateExecutorSettings(input.settings);
   if (original.runtime.started && (input.runMode ?? original.runMode ?? 'batch') !== (original.runMode ?? 'batch')) throw new Error('首次启动后运行方式已锁定');
   if (input.runMode === 'stream') { if (!input.streamPolicy) throw new Error('请填写流式策略'); validateStreamPolicy(input.streamPolicy, input.count); }
-  if (original.runtime.started && original.runMode === 'stream' && (input.streamPolicy?.sampleSize !== original.streamPolicy?.sampleSize || input.streamPolicy?.targetUnitCost !== original.streamPolicy?.targetUnitCost)) throw new Error('已启动样本规模锁定；成品单价修改请使用预算确认入口');
+  if (original.runtime.started && original.runMode === 'stream' && (input.streamPolicy?.sampleSize !== original.streamPolicy?.sampleSize || input.streamPolicy?.targetUnitCost !== original.streamPolicy?.targetUnitCost)) throw new Error('已启动的执行器不能修改旧版样本设置');
   if (!['video', 'image', 'audio', 'other'].includes(input.resourceType)) throw new Error('请选择输入资源类型');
   const next = original.runtime.started ? copy(workspace) : setExecutorInput(workspace, id, input.resource, input.count);
   const executor = next.executors.find(item => item.id === id)!;
@@ -115,7 +115,7 @@ export function changeExecutorState(workspace: LocalWorkspace, id: string, actio
   const next = copy(workspace);
   const executor = next.executors.find(item => item.id === id)!;
   const runtime = executor.runtime!;
-  if (executor.runMode === 'stream') { runtime.state = action === 'pause' ? 'paused' : 'running'; executorBatches(next, executor).forEach(b => { b.status = action === 'pause' ? '已暂停' : '运行中'; b.nodes.forEach(node => { if (action === 'pause' && node.status !== '已完成') node.status = '已暂停'; }); }); return next; }
+  if (executor.runMode === 'stream') { if (executor.stream) executor.stream.clockBoundaryAt = Date.now(); runtime.state = action === 'pause' ? 'paused' : 'running'; executorBatches(next, executor).forEach(b => { b.status = action === 'pause' ? '已暂停' : '运行中'; b.nodes.forEach(node => { if (action === 'pause' && node.status !== '已完成') node.status = '已暂停'; }); }); return next; }
   const batches = executorBatches(next, executor);
   const batch = batches[runtime.currentIndex];
   const now = timestamp();
@@ -179,9 +179,9 @@ function evaluateResult(workspace: LocalWorkspace, executor: LocalExecutor, batc
 }
 
 /** A deterministic local demonstration, advancing only while the page is open. */
-export function tickExecutor(workspace: LocalWorkspace, id: string): LocalWorkspace {
+export function tickExecutor(workspace: LocalWorkspace, id: string, observedProcessingMs = 0, observedAt?: number): LocalWorkspace {
   const original = workspace.executors.find(item => item.id === id);
-  if (original?.runMode === 'stream') return tickStream(workspace, id);
+  if (original?.runMode === 'stream') return tickStream(workspace, id, observedProcessingMs, observedAt);
   if (original?.runtime?.state !== 'running') return workspace;
   const next = copy(workspace);
   const executor = next.executors.find(item => item.id === id)!;
@@ -253,8 +253,9 @@ export function cloneExecutor(workspace: LocalWorkspace, sourceId: string, optio
   });
   const cloned: LocalExecutor = { id, name: options.name.trim(), description: `克隆自 ${source.name}`, projectId: source.projectId, source: source.source, clonedFrom: sourceId, flowIds: flows.map(f => f.id), flows,
     runMode: options.includeConfiguration ? source.runMode ?? 'batch' : 'batch', settings: options.includeConfiguration ? source.settings && { ...source.settings } : undefined,
+    concurrency: options.includeConfiguration ? source.concurrency : undefined,
     deliveryMode: options.includeConfiguration ? source.deliveryMode : undefined, notification: options.includeConfiguration && source.notification ? { ...source.notification } : undefined,
-    streamPolicy: options.includeConfiguration && source.streamPolicy ? { ...source.streamPolicy } : undefined,
+    streamPolicy: options.includeConfiguration && source.streamPolicy ? { ...source.streamPolicy, costLimitCents: undefined } : undefined,
     input: options.includeInput ? source.input : undefined, inputCount: options.includeInput ? source.inputCount : undefined, resourceType: options.includeInput ? source.resourceType : undefined };
   next.executors.push(cloned);
   const snapshots = Object.fromEntries(flows.map((flow, index) => [flow.graphKey ?? `annotation-demo.published.${flow.id}.v${flow.version ?? 1}`, { nodes: (executorBatches(workspace, source)[index]?.nodes ?? []).map(node => ({ id: String(node.seq), data: { operatorId: 'clone-snapshot', label: node.name } })) }]));

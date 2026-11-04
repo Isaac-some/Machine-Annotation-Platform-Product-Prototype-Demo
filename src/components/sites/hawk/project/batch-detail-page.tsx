@@ -62,8 +62,11 @@ export function BatchDetailPage() {
 
 export interface BatchExecutionContext {
   runMode?: 'batch' | 'stream';
+  activeRunMs?: number;
+  showRunClock?: boolean;
   inputSource: string;
   showInputSource?: boolean;
+  showBatchCaption?: boolean;
   waiting: boolean;
   canAction: (action: string) => boolean;
   onAction: (action: string) => void;
@@ -180,23 +183,26 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
   return <div className={'hawk-batch-page' + (execution ? ' hawk-batch-embedded' : '')}>
     {contextHolder}
     {breadcrumb}
-    <div className="hawk-batch-header">
+    <div className={`hawk-batch-header${execution?.showRunClock ? ' has-run-clock' : ''}`}>
       <div className="hawk-batch-header-top">
         <div className="hawk-batch-heading">批次详情<span style={{ color: pill.color, background: pill.bg }}>{batch.status}</span></div>
         <Space size={10} wrap>
-          <Select aria-label="通知强度" value={batch.notice} prefix="通知强度:" style={{ width: 190 }} onChange={notice => { if (updateBatch({ notice })) msg.success("通知强度已保存到本机"); }} options={["飞书加急", "飞书消息", "不通知"].map(value => ({ value, label: value }))} />
+          <Select aria-label="通知强度" value={batch.notice} prefix="通知强度:" style={{ width: 190 }} onChange={notice => { if (updateBatch({ notice })) msg.success("通知强度已保存到本机"); }} classNames={{ popup: { root: "hawk-notice-menu" } }} options={["飞书消息", "飞书加急", "短信加急", "电话加急", "梯度告警"].map(value => ({ value, label: value }))} />
           <Button onClick={() => { setDraftFields([...(batch.outputFields ?? [])]); setFieldsOpen(true); }}>输出字段</Button>
           <Button onClick={() => { configForm.setFieldsValue({ ...DEFAULT_CONFIG, ...batch.systemConfig, redis: { ...DEFAULT_CONFIG.redis, ...batch.systemConfig?.redis } }); setConfigOpen(true); }}>配 置</Button>
         </Space>
       </div>
-      {execution && <div className="hawk-batch-executor-caption"><strong>{batch.name}</strong><span>批次 ID {batch.id} · {batch.workflow}</span></div>}
+      {execution && execution.showBatchCaption !== false && <div className="hawk-batch-executor-caption"><strong>{batch.name}</strong><span>批次 ID {batch.id} · {batch.workflow}</span></div>}
       <div className="hawk-batch-metrics-cost">
         <div className="hawk-batch-metrics">{[[n(batch.total), "总数", "#111827"], [n(batch.success), "成功", "#52c41a"], [n(batch.failed), "失败", "#ff4d4f"], [n(batch.filtered), "已过滤", "#faad14"]].map(([value, label, color]) => <div key={label}><strong style={{ color }}>{value}</strong><span>{label}</span></div>)}</div>
+        <div className="hawk-batch-runtime-cost">
+        {execution?.showRunClock && <div className="hawk-batch-runtime"><span>实际运行时长</span><strong aria-label="批次实际运行时长">{execution.activeRunMs === undefined ? '—' : [Math.floor(execution.activeRunMs / 3600000), Math.floor(execution.activeRunMs / 60000) % 60, Math.floor(execution.activeRunMs / 1000) % 60].map(value => String(value).padStart(2, '0')).join(':')}</strong></div>}
         <div className="hawk-batch-estimate"><span>批次预估成本</span><div><strong>{batch.cost === "-" ? "¥ 0.00" : batch.cost}</strong><Button type="link" onClick={() => setCostTarget("batch")}>查看成本详情 <RightOutlined /></Button></div></div>
+        </div>
       </div>
       <div className="hawk-batch-header-bottom">
         <div className="hawk-batch-progress">{[[batch.success, "#52c41a"], [batch.filtered, "#faad14"], [batch.failed, "#ff4d4f"]].map(([value, color]) => <span key={color} style={{ background: color as string, width: batch.total > 0 ? Math.max(0, Number(value)) / batch.total * 100 + "%" : "0%" }} />)}</div>
-        <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
+        <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动','重试'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
       </div>
     </div>
     <div className="hawk-batch-graph" ref={graphRef} onPointerDown={event => {

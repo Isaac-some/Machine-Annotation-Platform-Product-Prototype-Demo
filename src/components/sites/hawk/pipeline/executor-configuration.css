@@ -31,3 +31,9 @@
 .hawk-executor-configuration .hawk-executor-config-footnote{border-top:1px solid #e5eaf1;padding:16px 0 20px}
 .hawk-executor-configuration .ant-input[disabled],.hawk-executor-configuration .ant-input-number-disabled .ant-input-number-input{color:#64748b}
 @media(max-width:640px){.hawk-executor-configuration .hawk-executor-config-grid{grid-template-columns:minmax(0,1fr);gap:16px}.hawk-executor-configuration.hawk-settings-modal .hawk-settings-row{grid-template-columns:minmax(0,1fr);gap:12px}.hawk-executor-configuration .hawk-executor-mode>.ant-radio-button-wrapper{padding:0 10px}.hawk-executor-configuration .hawk-executor-target-settings{padding:12px}.hawk-executor-configuration .hawk-executor-reminder>.ant-radio-button-wrapper{padding:0 10px}}
+
+.hawk-executor-configuration .hawk-observation-slider{padding:20px 12px 0;margin-bottom:32px}
+.hawk-executor-configuration .hawk-observation-slider .ant-slider{margin-inline:0}
+.hawk-executor-configuration .ant-form-item-extra{font-size:12px;line-height:20px;color:#64748b;margin-top:6px}
+.hawk-executor-configuration .ant-radio-button-wrapper-disabled,.hawk-executor-configuration .ant-select-disabled .ant-select-selection-item{color:#5f6874}
+.hawk-executor-configuration .hawk-observation-slider .ant-slider-mark-text{width:max-content;white-space:nowrap}

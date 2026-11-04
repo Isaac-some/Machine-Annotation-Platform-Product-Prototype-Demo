@@ -12,46 +12,53 @@ const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2
 const fresh = () => withPhase2Examples({ groups: [], projects: [], executors: [], batches: [] });
 const get = (w, id = 'phase2-demo') => w.executors.find(e => e.id === id);
 const tick = (w, n = 1, id = 'phase2-demo') => { for (let i = 0; i < n; i++) w = S.tickStream(JSON.parse(JSON.stringify(w)), id); return w; };
-const sampled = (id = 'phase2-demo') => tick(S.startStream(fresh(), id), 30, id);
+const started = (id = 'phase2-demo') => S.startStream(fresh(), id);
+const sampled = (id = 'phase2-demo') => tick(started(id), 30, id);
 
-test('sample output arrives downstream before upstream is exhausted and is retained for production', () => {
-  let w = S.startStream(fresh(), 'phase2-demo'); w = tick(w, 4);
-  const s = get(w).stream; assert(s.stages[1].processed > 0); assert(s.admitted < 24);
-  w = tick(w, 30); const e = get(w), sampleCost = e.stream.costCents;
-  assert.equal(e.stream.phase, 'budget'); assert.equal(e.stream.sampleOutputs, 6); assert.equal(e.stream.predicted, 36);
-  const firstKeys = w.batches.find(b => b.id === e.runtime.batchIds[0]).results.map(r => r.id);
-  w = S.confirmStreamBudget(w, e.id, 36, 0.8); w = tick(w, 200);
-  const completed = get(w); assert.equal(completed.stream.admitted, 24); assert(completed.stream.costCents > sampleCost);
-  assert.equal(completed.stream.retryRound, 1); assert.equal(completed.stream.phase, 'completed');
-  const keys = w.batches.find(b => b.id === e.runtime.batchIds[0]).results.map(r => r.id);
-  assert.equal(new Set(keys).size, keys.length); assert(firstKeys.every(k => keys.includes(k)));
-  assert(completed.stream.stages.at(-1).outputs > 24); // one-to-many product price uses final units
+test('streaming starts immediately and processes the complete fixed input without a sample gate', () => {
+  let w = started(); assert.equal(get(w).stream.phase, 'production'); assert.equal(get(w).stream.admitted, 0);
+  w = tick(w, 200); const completed = get(w);
+  assert.equal(completed.stream.admitted, 24); assert.equal(completed.stream.phase, 'completed');
+  assert.equal(completed.stream.retryRound, 1); assert(completed.stream.settledInputs >= 24);
+  assert(completed.stream.stages[1].processed > 0); assert(completed.stream.stages.at(-1).outputs > 24);
+  assert.equal(Object.values(completed.stream.inputMetrics).reduce((sum, row) => sum + row.costCents, 0), completed.stream.costCents);
+  assert.equal(Object.values(completed.stream.inputMetrics).reduce((sum, row) => sum + row.finalOutputs, 0), completed.stream.stages.at(-1).outputs);
+  const keys = w.batches.find(b => b.id === completed.runtime.batchIds[0]).results.map(r => r.id);
+  assert.equal(new Set(keys).size, keys.length);
 });
-test('a changed forecast does not silently change the effective formula budget', () => {
-  let w = S.confirmStreamBudget(sampled(), 'phase2-demo', 36, 0.8); const before = get(w).stream.budget;
-  w = tick(w, 16); assert.deepEqual(get(w).stream.budget, before);
-  w = S.confirmStreamBudget(w, 'phase2-demo', 40, 0.9); assert.equal(get(w).stream.budget.cents, 3600); assert.equal(get(w).stream.budgetHistory.length, 2);
+test('optional cost ceiling stops new admission, drains in-flight work and leaves room to adjust the cap', () => {
+  let w = fresh(); get(w).streamPolicy.costLimitCents = 432; get(w).streamPolicy.reminderRatio = 60;
+  w = S.startStream(w, 'phase2-demo');
+  for (let i = 0; i < 100 && get(w).stream.phase !== 'review'; i++) w = tick(w, 1);
+  const s = get(w).stream, admitted = s.admitted;
+  assert.equal(s.phase, 'review'); assert(admitted < 24); assert(s.triggerCostCents >= 432); assert(s.drainFinalCents > s.triggerCostCents); assert(s.reminded);
+  w = S.setStreamCostLimit(w, 'phase2-demo', 10000); assert.equal(get(w).stream.costLimitCents, 10000);
+  w = S.continueStreamManually(w, 'phase2-demo'); w = tick(w, 200);
+  assert.equal(get(w).stream.admitted, 24); assert.equal(get(w).stream.phase, 'completed');
 });
-test('budget stops admission and new retries while downstream draining can exceed the trigger cost', () => {
-  let w = sampled('phase2-cost'); const e = get(w, 'phase2-cost');
-  w = S.confirmStreamBudget(w, e.id, 36, 0.12);
-  for (let i = 0; i < 100 && get(w, e.id).stream.triggerCostCents === undefined; i++) w = tick(w, 1, e.id);
-  const trigger = get(w, e.id).stream, admitted = trigger.admitted; assert(trigger.triggerCostCents >= 432); assert(trigger.reminded);
-  w = tick(w, 100, e.id); const s = get(w, e.id).stream;
-  assert.equal(s.admitted, admitted); assert(admitted < 24); assert.equal(s.retryRound, 0); assert(s.costCents > s.triggerCostCents); assert.equal(s.phase, 'review');
+test('no cost ceiling is valid and zero deliverables never create a unit-cost estimate', () => {
+  let w = started(); assert.equal(get(w).stream.costLimitCents, undefined);
+  get(w).stream.demoOutcome = 'zero'; get(w).streamPolicy.maxRetries = 0; w = tick(w, 200);
+  const s = get(w).stream; assert.equal(s.phase, 'review'); assert.equal(s.stages.at(-1).outputs, 0); assert.equal(s.predicted, undefined);
 });
-test('zero output cannot confirm a budget; incomplete samples have no forecast confirmation', () => {
-  let w = S.startStream(fresh(), 'phase2-demo'); assert.throws(() => S.confirmStreamBudget(w, 'phase2-demo', 24, 1), /未跑通/);
-  get(w).stream.demoOutcome = 'zero'; w = tick(w, 40); assert.equal(get(w).stream.sampleOutputs, 0); assert.throws(() => S.confirmStreamBudget(w, 'phase2-demo', 24, 1), /零成品/);
-});
-test('retry is finite, follows the entire first round, and 0 disables automatic retry', () => {
-  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 40);
-  w = S.confirmStreamBudget(w, 'phase2-demo', 36, 1); w = tick(w, 200);
-  const e = get(w); assert.equal(e.stream.retryRound, 0); assert(e.stream.failures.length > 0);
+test('finite retries follow the full first pass and zero disables automatic retry', () => {
+  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 100);
+  const e = get(w); assert.equal(e.stream.retryRound, 0); assert(e.stream.failures.length > 0); assert.equal(e.stream.phase, 'review');
   const events = e.stream.events.map(x => x.text); assert(!events.some(x => x.includes('启动第')));
 });
+test('manual stage retry skips upstream work and sends recovered outputs downstream', () => {
+  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 100);
+  const before = get(w), stage = 1, token = before.stream.failures.find(item => item.stage === stage);
+  assert(token); const upstreamProcessed = before.stream.stages[0].processed;
+  w = S.retryStreamStage(w, before.id, stage);
+  assert.equal(get(w).stream.control, 'manual'); assert.equal(get(w).stream.failures.some(item => item.stage === stage), false);
+  w = tick(w, 20);
+  assert.equal(get(w).stream.stages[0].processed, upstreamProcessed);
+  assert(get(w).stream.stages[stage + 1].processed > 0);
+  assert.equal(get(w).stream.phase, 'review');
+});
 test('manual recovery keeps executor, batches, output identities and successful results', () => {
-  let w = sampled('phase2-cost'); w = S.confirmStreamBudget(w, 'phase2-cost', 36, 0.12); w = tick(w, 150, 'phase2-cost');
+  let w = started('phase2-cost'); w = tick(w, 8, 'phase2-cost'); w = S.takeOverStream(w, 'phase2-cost'); w = tick(w, 100, 'phase2-cost');
   const before = get(w, 'phase2-cost'), batchIds = [...before.runtime.batchIds];
   w = S.takeOverStream(w, before.id); w = tick(w, 40, before.id); assert(get(w, before.id).stream.failures.length);
   const results = w.batches.filter(b => batchIds.includes(b.id)).flatMap(b => b.results.map(r => r.id));
@@ -90,17 +97,140 @@ test('ordinary paused retry prepares inputs, recovers failed rows first and pres
 test('a paused stream stage blocks upstream admission and resumes without duplicate output', () => {
   let w = S.startStream(fresh(), 'phase2-demo'); w = tick(w, 3); w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 4);
   const admitted = get(w).stream.admitted; w = tick(w, 8); assert.equal(get(w).stream.admitted, admitted);
-  w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 50); assert.equal(get(w).stream.phase, 'budget'); assert.equal(get(w).stream.sampleOutputs, 6);
+  w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 100); assert.equal(get(w).stream.phase, 'completed');
 });
-test('manual continuation explicitly admits remaining fixed input without resetting cumulative cost', () => {
-  let w = sampled('phase2-cost'); w = S.confirmStreamBudget(w, 'phase2-cost', 36, 0.12); w = tick(w, 150, 'phase2-cost'); w = S.takeOverStream(w, 'phase2-cost'); w = tick(w, 20, 'phase2-cost');
-  const cost=get(w,'phase2-cost').stream.costCents; w=S.continueStreamManually(w,'phase2-cost');w=tick(w,200,'phase2-cost');
-  assert.equal(get(w,'phase2-cost').stream.admitted,24);assert(get(w,'phase2-cost').stream.costCents>cost);assert.equal(get(w,'phase2-cost').stream.retryRound,0);
+test('manual continuation requires a higher or removed cap and retains cumulative cost', () => {
+  let w = fresh(); get(w, 'phase2-cost').streamPolicy.costLimitCents = 250; w = S.startStream(w, 'phase2-cost');
+  for (let i = 0; i < 100 && get(w, 'phase2-cost').stream.phase !== 'review'; i++) w = tick(w, 1, 'phase2-cost');
+  const cost = get(w, 'phase2-cost').stream.costCents;
+  assert.throws(() => S.continueStreamManually(w, 'phase2-cost'), /提高或取消/);
+  w = S.setStreamCostLimit(w, 'phase2-cost', 10000); w = S.continueStreamManually(w, 'phase2-cost'); w = tick(w, 100, 'phase2-cost');
+  assert.equal(get(w, 'phase2-cost').stream.admitted, 24); assert(get(w, 'phase2-cost').stream.costCents > cost);
 });
-test('unknown downstream totals stay unknown and original drain charges are frozen before manual continuation', () => {
+test('unknown downstream totals stay unknown until their upstream inputs arrive', () => {
  let w=S.startStream(fresh(),'phase2-cost');w=tick(w,4,'phase2-cost');const ids=get(w,'phase2-cost').runtime.batchIds;
  assert.equal(w.batches.find(b=>b.id===ids[1]).total,-1);
- w=tick(w,40,'phase2-cost');w=S.confirmStreamBudget(w,'phase2-cost',36,0.12);w=tick(w,100,'phase2-cost');
- const final=get(w,'phase2-cost').stream.drainFinalCents;assert(final>get(w,'phase2-cost').stream.triggerCostCents);
- w=S.takeOverStream(w,'phase2-cost');w=tick(w,1,'phase2-cost');w=S.continueStreamManually(w,'phase2-cost');w=tick(w,100,'phase2-cost');assert.equal(get(w,'phase2-cost').stream.drainFinalCents,final);assert(get(w,'phase2-cost').stream.costCents>final);
+});
+
+test('paused stage retry isolates normal queues and restores them after downstream recovery', () => {
+  let w = tick(started(), 18);
+  w = R.changeExecutorState(w, 'phase2-demo', 'pause');
+  const before = structuredClone(get(w)), stage = 1;
+  assert(before.stream.failures.some(t => t.stage === stage));
+  assert(before.stream.queues.flat().length > 0);
+  w = S.retryStreamStage(w, before.id, stage);
+  assert.equal(get(w).stream.stageRecovery.preparation, 0);
+  assert.deepEqual(get(w).stream.stageRecovery.queues, before.stream.queues);
+  assert.throws(() => S.retryStreamStage(w, before.id, stage), /正在重试/);
+  for (let i = 0; i < 100 && get(w).stream.stageRecovery; i++) w = tick(w);
+  const after = get(w);
+  assert.equal(after.runtime.state, 'paused');
+  assert.equal(after.stream.stages[0].processed, before.stream.stages[0].processed);
+  assert.equal(after.stream.admitted, before.stream.admitted);
+  assert.deepEqual(after.stream.queues, before.stream.queues);
+  assert(after.stream.stages[2].processed > before.stream.stages[2].processed);
+  assert(after.stream.costCents > before.stream.costCents);
+  const results = w.batches.flatMap(b => b.results ?? []).map(r => r.id);
+  assert.equal(new Set(results).size, results.length);
+  w = R.changeExecutorState(w, before.id, 'resume'); w = tick(w, 200);
+  assert.equal(get(w).stream.phase, 'completed');
+  assert.equal(get(w).stream.stages.at(-1).outputs, 36);
+});
+
+test('stage retry rejects running, empty and exhausted budget without mutating input', () => {
+  let w = tick(started(), 18), before = JSON.stringify(w);
+  assert.throws(() => S.retryStreamStage(w, 'phase2-demo', 1), /暂停/);
+  assert.equal(JSON.stringify(w), before);
+  w = R.changeExecutorState(w, 'phase2-demo', 'pause');
+  assert.throws(() => S.retryStreamStage(w, 'phase2-demo', 2), /没有失败/);
+  get(w).stream.costLimitCents = get(w).stream.costCents;
+  before = JSON.stringify(w);
+  assert.throws(() => S.retryStreamStage(w, 'phase2-demo', 1), /成本上限/);
+  assert.equal(JSON.stringify(w), before);
+});
+
+test('measured execution time counts concurrent stages once, excludes pause, blocked queues and preparation, survives reload', () => {
+  let w = started();
+  w = S.tickStream(w, 'phase2-demo', 930); // Admission only; no active stage yet.
+  assert.equal(get(w).stream.activeRunMs, 0);
+  w = S.tickStream(w, 'phase2-demo', 740);
+  assert.equal(get(w).stream.activeRunMs, 740);
+  w = S.tickStream(w, 'phase2-demo', 510); // A and B overlap.
+  assert.equal(get(w).stream.activeRunMs, 1250);
+  assert.equal(get(w).stream.stageActiveMs[0], 1250);
+  assert.equal(get(w).stream.stageActiveMs[1], 510);
+  w = R.changeExecutorState(w, 'phase2-demo', 'pause');
+  w = S.tickStream(JSON.parse(JSON.stringify(w)), 'phase2-demo', 60000);
+  assert.equal(get(w).stream.activeRunMs, 1250);
+  w = R.changeExecutorState(w, 'phase2-demo', 'resume');
+  w = S.tickStream(w, 'phase2-demo', 250);
+  assert.equal(get(w).stream.activeRunMs, 1500);
+  get(w).stream.pausedStages = [0, 1, 2];
+  w = S.tickStream(w, 'phase2-demo', 5000);
+  assert.equal(get(w).stream.activeRunMs, 1500);
+  get(w).stream.pausedStages = []; get(w).stream.preparation = 0;
+  w = S.tickStream(w, 'phase2-demo', 9000);
+  assert.equal(get(w).stream.activeRunMs, 1500);
+  delete get(w).stream.activeRunMs; delete get(w).stream.stageActiveMs;
+  w = S.tickStream(w, 'phase2-demo', 1000);
+  assert.equal(get(w).stream.activeRunMs, undefined); // Legacy history is never fabricated.
+});
+
+test('input limit stops exactly at admitted count, drains downstream and requires a changed limit before continuation', () => {
+  let w = fresh(); get(w).streamPolicy.inputLimit = 3;
+  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  assert.equal(get(w).stream.admitted, 3); assert.equal(get(w).stream.stopReason, 'input');
+  assert.equal(get(w).stream.phase, 'review'); assert(get(w).stream.stages[2].outputs > 0);
+  assert.equal(get(w).stream.retryRound, 0);
+  assert.throws(() => S.continueStreamManually(w, 'phase2-demo'), /上限/);
+  w = S.setStreamLimits(w, 'phase2-demo', { inputLimit: 6 });
+  w = tick(S.continueStreamManually(w, 'phase2-demo'), 100);
+  assert.equal(get(w).stream.admitted, 6);
+});
+
+test('runtime limit stops admission at real measured time, drains and does not infer time from tick count', () => {
+  let w = fresh(); get(w).streamPolicy.runtimeLimitMs = 1900;
+  w = S.startStream(w, 'phase2-demo');
+  w = S.tickStream(w, 'phase2-demo', 800); // No work yet.
+  w = S.tickStream(w, 'phase2-demo', 1100);
+  w = S.tickStream(w, 'phase2-demo', 800);
+  const admitted = get(w).stream.admitted;
+  assert.equal(get(w).stream.stopReason, 'time'); assert.equal(admitted, 2);
+  for (let i = 0; i < 30; i++) w = S.tickStream(w, 'phase2-demo', 240);
+  assert.equal(get(w).stream.admitted, admitted); assert.equal(get(w).stream.phase, 'review');
+  assert(get(w).stream.activeRunMs > 1900); // In-flight processing finishes after the admission limit.
+  assert.throws(() => S.continueStreamManually(w, 'phase2-demo'), /上限/);
+  w = S.setStreamLimits(w, 'phase2-demo', {});
+  w = tick(S.continueStreamManually(w, 'phase2-demo'), 100);
+  assert.equal(get(w).stream.admitted, 24);
+});
+
+test('output goal stops new admission; supplemental-input contract contains evidence without calculating or dispatching inputs/retries', () => {
+  let w = fresh(); get(w).streamPolicy.targetOutputCount = 2; get(w).streamPolicy.maxRetries = 0;
+  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  const e = get(w); assert.equal(e.stream.stopReason, 'target'); assert(e.stream.admitted < 24);
+  assert(e.stream.stages.at(-1).outputs >= 2); assert.equal(e.stream.retryRound, 0);
+  const before = JSON.stringify(w), request = S.buildUpstreamInputRequest(e);
+  assert.equal(request.targetOutputCount, 2); assert.equal(request.estimateStatus, 'awaiting-upstream');
+  assert.equal(request.retryPolicy.manualRetryRequiresUserAction, true);
+  assert.equal(request.requiredAdditionalInputCount, undefined); assert.equal(JSON.stringify(w), before);
+  for (const policy of [{ inputLimit: -1 }, { runtimeLimitMs: Infinity }, { targetOutputCount: 1.5 }]) {
+    assert.throws(() => S.validateStreamPolicy({ maxRetries: 0, ...policy }, 24));
+  }
+});
+
+test('resume boundary excludes the paused portion of a shared driver interval', () => {
+  let w = tick(started(), 2); const before = get(w).stream.activeRunMs;
+  get(w).stream.clockBoundaryAt = 9500;
+  w = S.tickStream(w, 'phase2-demo', 1200, 10000);
+  assert.equal(get(w).stream.activeRunMs - before, 500);
+  assert.equal(get(w).stream.stageActiveMs[0], 500);
+});
+
+test('a goal above available production never requests more inputs or retries beyond configured policy', () => {
+  let w = fresh(); get(w).streamPolicy.targetOutputCount = 1000; get(w).streamPolicy.maxRetries = 0;
+  w = tick(S.startStream(w, 'phase2-demo'), 200);
+  const e = get(w); assert.equal(e.stream.admitted, 24); assert.equal(e.stream.retryRound, 0);
+  assert(e.stream.stages.at(-1).outputs < 1000); assert.match(e.stream.reason, /尚未达到目标/);
+  const before = JSON.stringify(w); w = tick(w, 100); assert.equal(JSON.stringify(w), before);
 });

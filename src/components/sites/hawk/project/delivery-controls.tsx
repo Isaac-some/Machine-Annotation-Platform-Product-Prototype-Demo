@@ -1,14 +1,14 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Alert, Button, ConfigProvider, Drawer, Dropdown, Empty, InputNumber, Modal, Progress, Radio, Select, Space, Table, Tag, Typography, message } from 'antd';
+import { Alert, Button, ConfigProvider, Drawer, Dropdown, Empty, Modal, Progress, Radio, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, CheckOutlined, DatabaseOutlined, DownOutlined, DownloadOutlined, ExportOutlined, HistoryOutlined, OrderedListOutlined, StopOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { readWorkspace, useWorkspace, writeWorkspace } from '../data/local-workspace';
 import { DELIVERY_LABELS, EXPORT_PHASES, beijingTime, createExportJob, deliveryLocked, exportCsv, hasDownstream, rangeLabel, retryExportJob, selectResults, setDeliveryMode, type DeliveryMode, type ExportJob, type ExportRange } from '../data/delivery';
 import zhCN from 'antd/locale/zh_CN';
 import 'dayjs/locale/zh-cn';
 import { ExportDateTimePicker } from './export-date-time-picker';
-import { deliveredWindow, latestDeliveredEnd, recentExportRange } from '../data/export-window';
+import { deliveredWindow, latestDeliveredEnd } from '../data/export-window';
 import { CURRENT_USER } from '../data/names';
 import './delivery.css';
 import './settings-dialog.css';
@@ -93,25 +93,25 @@ export function DeliveryControls({ batchId, executorId }: { batchId?: number; ex
   const [open, setOpen] = useState(false), [historyOpen, setHistoryOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | undefined>(batchId);
   const [scope, setScope] = useState<'all' | 'time'>('all');
-  const [timeMode, setTimeMode] = useState<'absolute' | 'recent'>('absolute');
+  const [endAtNow, setEndAtNow] = useState(false);
   const [start, setStart] = useState<number | null>(null), [end, setEnd] = useState<number | null>(null), [sorted, setSorted] = useState(true);
-  const [duration, setDuration] = useState<number | null>(1), [unit, setUnit] = useState(60), [anchor, setAnchor] = useState(0);
+  const [anchor, setAnchor] = useState(0);
   const [error, setError] = useState('');
   const requestId = useRef(''), submitting = useRef(false);
   const ids = workspace.executors.find(item => item.id === executorId)?.runtime?.batchIds ?? [];
   const candidates = batchId !== undefined ? workspace.batches.filter(item => item.id === batchId) : ids.map(id => workspace.batches.find(item => item.id === id)).filter(item => item !== undefined);
   const selected = candidates.find(item => item.id === selectedId);
   const jobs = (workspace.exportJobs ?? []).filter(item => batchId !== undefined ? item.batchId === batchId : item.executorId === executorId).toReversed();
-  const range: ExportRange = scope === 'all' ? { kind: 'all' } : timeMode === 'recent' ? recentExportRange(duration && duration > 0 ? duration * unit : 1, anchor) : { kind: 'interval', start: start ?? NaN, end: end ?? NaN };
+  const range: ExportRange = scope === 'all' ? { kind: 'all' } : { kind: 'interval', start: start ?? NaN, end: end ?? NaN };
   const selectedJobs = jobs.filter(job => job.batchId === selectedId && job.status === 'succeeded');
   const firstResultAt = (selected?.results ?? []).reduce((first, row) => Math.min(first, row.completedAt), anchor);
   const previousEnd = latestDeliveredEnd(selectedJobs, firstResultAt);
   let count = 0, validation = '';
   try { if (selected) count = selectResults(selected, range).length; }
   catch (issue) { validation = issue instanceof Error ? issue.message : '请检查时间范围'; }
-  if (scope === 'time' && timeMode === 'recent' && (!duration || duration <= 0)) validation = '请填写大于 0 的时长';
+  const setCurrentEnd = () => { const now = Date.now(); setEnd(now); setAnchor(now); setError(''); };
   const show = () => {
-    setSelectedId(batchId ?? ids.at(-1)); setScope('all'); setTimeMode('absolute'); setStart(null); setEnd(null); setDuration(1); setUnit(60); setAnchor(Date.now()); setSorted(true); setError(''); requestId.current = crypto.randomUUID(); submitting.current = false; setOpen(true);
+    setSelectedId(batchId ?? ids.at(-1)); setScope('all'); setEndAtNow(false); setStart(null); setEnd(null); setAnchor(Date.now()); setSorted(true); setError(''); requestId.current = crypto.randomUUID(); submitting.current = false; setOpen(true);
   };
   const submit = () => {
     if (submitting.current || selectedId === undefined) return;
@@ -127,7 +127,7 @@ export function DeliveryControls({ batchId, executorId }: { batchId?: number; ex
       <div className="hawk-export-form">
         <section className="hawk-settings-section hawk-export-origin">
           <div className="hawk-settings-section-heading"><h3><DatabaseOutlined />导出来源</h3></div>
-          {batchId === undefined && <label>导出环节<Select aria-label="导出环节" value={selectedId} onChange={id => { setSelectedId(id); setStart(null); setEnd(null); setError(''); }} options={candidates.map((batch, index) => ({ value: batch.id, label: `第 ${index + 1} 步 · ${batch.name}${index === candidates.length - 1 ? '（最终结果）' : '（中间结果）'}` }))} /></label>}
+          {batchId === undefined && <label>导出环节<Select aria-label="导出环节" value={selectedId} onChange={id => { setSelectedId(id); setStart(null); setEnd(null); setEndAtNow(false); setAnchor(Date.now()); setError(''); }} options={candidates.map((batch, index) => ({ value: batch.id, label: `第 ${index + 1} 步 · ${batch.name}${index === candidates.length - 1 ? '（最终结果）' : '（中间结果）'}` }))} /></label>}
           {selected && <div className="hawk-export-source"><strong>{selected.name}</strong><span>批次 {selected.id}{hasDownstream(workspace, selected.id) ? ' · 中间结果，尚未经过全部后续处理' : ' · 最终结果'}</span></div>}
         </section>
         <section className="hawk-settings-section">
@@ -135,22 +135,22 @@ export function DeliveryControls({ batchId, executorId }: { batchId?: number; ex
           <Radio.Group className="hawk-export-range-switch" aria-label="导出范围" optionType="button" value={scope} onChange={event => { setScope(event.target.value); setError(''); }} options={[{ value: 'all', label: '全部已完成' }, { value: 'time', label: '按时间导出' }]} />
           {scope === 'all' && <p className="hawk-export-help">导出当前已完成的成功结果；仍在运行的批次可随时导出。</p>}
           {scope === 'time' && <>
-            <Radio.Group className="hawk-export-time-mode" aria-label="时间选择方式" value={timeMode} onChange={event => { setTimeMode(event.target.value); setError(''); }} options={[{ value: 'absolute', label: '指定起止时间' }, { value: 'recent', label: '从现在往前' }]} />
-            {timeMode === 'absolute' ? <ConfigProvider locale={zhCN}><div className="hawk-export-times">
+            <div className="hawk-export-time-shortcut">
+              <label><Switch size="small" aria-label="从当前时间向前" checked={endAtNow} onChange={checked => { setEndAtNow(checked); if (checked) setCurrentEnd(); else setError(''); }} /><span>从当前时间向前</span></label>
+              {endAtNow && <Button type="link" size="small" onClick={setCurrentEnd}>更新为现在</Button>}
+            </div>
+            <ConfigProvider locale={zhCN}><div className="hawk-export-times">
               <label>开始时间（含）<ExportDateTimePicker label="开始时间（北京时间）" placeholder="选择开始日期和时间" value={start} onChange={value => { setStart(value); setError(''); }} /></label>
-              <label>结束时间（不含）<ExportDateTimePicker label="结束时间（北京时间）" placeholder="选择结束日期和时间" value={end} onChange={value => { setEnd(value); setError(''); }} /></label>
-            </div></ConfigProvider> : <div className="hawk-export-relative">
-              <span>最近</span><InputNumber aria-label="往前时长" min={0.01} value={duration} onChange={setDuration} /><Select aria-label="时长单位" value={unit} onChange={setUnit} options={[{ value: 1, label: '分钟' }, { value: 60, label: '小时' }, { value: 1440, label: '天' }]} />
-              <p>截止点：{beijingTime(anchor)}<Button type="link" size="small" onClick={() => setAnchor(Date.now())}>更新为现在</Button></p>
-            </div>}
+              <label>结束时间（不含）<ExportDateTimePicker label="结束时间（北京时间）" placeholder="选择结束日期和时间" value={end} disabled={endAtNow} onChange={value => { setEnd(value); setError(''); }} /></label>
+            </div></ConfigProvider>
             <ExportTimeline jobs={selectedJobs} firstResultAt={firstResultAt} now={anchor} range={range} />
-            <div className="hawk-export-continuation"><Button size="small" disabled={previousEnd === undefined || previousEnd >= anchor} onClick={() => { setTimeMode('absolute'); setStart(previousEnd!); setEnd(anchor); setError(''); }}>接着上次成功导出</Button><span>{previousEnd === undefined ? '暂无成功导出记录' : `上次截止：${beijingTime(previousEnd)}`}</span></div>
+            <div className="hawk-export-continuation"><Button size="small" disabled={previousEnd === undefined || previousEnd >= anchor} onClick={() => { setStart(previousEnd!); setEnd(anchor); setError(''); }}>接着上次成功导出</Button><span>{previousEnd === undefined ? '暂无成功导出记录' : `上次截止：${beijingTime(previousEnd)}`}</span></div>
             <p className="hawk-export-help">按结果完成时间筛选，含开始、不含结束。历史区间仅供参考，重叠范围仍完整导出。</p>
           </>}
 
         </section>
         <section className="hawk-settings-section hawk-export-order-section">
-          <div className="hawk-settings-row"><div className="hawk-settings-row-label"><strong>文件顺序</strong><p>{sorted ? '与输入顺序保持一致，适合逐条对应核对。' : '无需保持输入顺序时选择，跳过排序，文件生成更快。'}</p></div><DeliveryOrderSwitch label="文件顺序" value={sorted ? 'sorted' : 'unsorted'} onChange={value => setSorted(value === 'sorted')} /></div>
+            <div className="hawk-settings-row"><div className="hawk-settings-row-label"><strong>文件顺序</strong><p>{sorted ? '仅对本次结果输出文件排序，使文件行与输入顺序对应。' : '仅跳过本次结果输出文件的排序；不改变批次或处理顺序，文件生成更快。'}</p></div><DeliveryOrderSwitch label="文件顺序" value={sorted ? 'sorted' : 'unsorted'} onChange={value => setSorted(value === 'sorted')} /></div>
         </section>
         <div className="hawk-export-preview"><strong>{count.toLocaleString()}</strong><span>条可导出结果</span><p>提交时固定本次结果，之后新完成的数据留给下次。导出不会暂停处理或启动下游。</p></div>
         {selected?.results === undefined && <Alert type="info" showIcon message="历史批次缺少逐条结果与完成时间，不能创建新的范围导出；原交付文件仍可查看。" />}
