@@ -219,6 +219,79 @@ test('output goal stops new admission; supplemental-input contract contains evid
   }
 });
 
+const targetReached = (policy = {}) => {
+  let w = fresh();
+  Object.assign(get(w).streamPolicy, { targetOutputCount: 8, maxRetries: 2 }, policy);
+  w = S.startStream(w, 'phase2-demo');
+  for (let i = 0; i < 100 && get(w).stream.stopReason !== 'target'; i++) w = tick(w);
+  assert.equal(get(w).stream.stopReason, 'target');
+  assert(get(w).stream.failures.length > 0);
+  return w;
+};
+
+test('reaching the output goal drains and retries failures without admitting more inputs or replaying successes', () => {
+  let w = targetReached();
+  const before = structuredClone(get(w));
+  const successfulResults = w.batches.flatMap(b => b.results ?? []).map(r => r.id);
+  const transitions = [];
+  for (let i = 0; i < 100 && get(w).runtime.state === 'running'; i++) {
+    w = tick(w);
+    assert.equal(get(w).stream.admitted, before.stream.admitted);
+    transitions.push(structuredClone(get(w).stream));
+  }
+  const e = get(w);
+  const retryStart = transitions.find(s => s.retryRound > 0);
+  assert(retryStart, 'goal attainment must not disable configured automatic retries');
+  assert(retryStart.queues.flat().every(token => token.attempt > 0));
+  assert.equal(e.stream.retryRound, 1);
+  assert.equal(e.stream.failures.length, 0);
+  assert.equal(e.stream.phase, 'review');
+  assert.equal(e.runtime.state, 'waiting');
+  assert.equal(e.stream.stages[0].processed, e.stream.admitted);
+  assert(e.stream.stages.at(-1).outputs > before.stream.stages.at(-1).outputs);
+  assert(e.stream.costCents > before.stream.costCents);
+  const afterResults = w.batches.flatMap(b => b.results ?? []).map(r => r.id);
+  assert(successfulResults.every(id => afterResults.includes(id)));
+  assert.equal(new Set(afterResults).size, afterResults.length);
+  const stopped = JSON.stringify(w);
+  assert.equal(JSON.stringify(tick(w, 100)), stopped);
+});
+
+test('goal completion respects disabled and exhausted retry allowances', () => {
+  for (const maxRetries of [0, 1]) {
+    let w = targetReached({ maxRetries });
+    get(w).stream.retryRound = maxRetries;
+    const before = structuredClone(get(w).stream);
+    w = tick(w, 100);
+    assert.equal(get(w).stream.retryRound, maxRetries);
+    assert.equal(get(w).stream.admitted, before.admitted);
+    assert(get(w).stream.failures.length > 0);
+    assert.equal(get(w).stream.phase, 'review');
+  }
+});
+
+test('cost and runtime ceilings still prevent new retry rounds after reaching the output goal', () => {
+  for (const ceiling of ['cost', 'time']) {
+    let w = targetReached();
+    const s = get(w).stream;
+    if (ceiling === 'cost') {
+      get(w).streamPolicy.costLimitCents = s.costCents + 1;
+      s.costLimitCents = s.costCents + 1;
+    } else {
+      get(w).streamPolicy.runtimeLimitMs = 1;
+    }
+    const admitted = s.admitted;
+    for (let i = 0; i < 100 && get(w).runtime.state === 'running'; i++) w = S.tickStream(w, 'phase2-demo', 1);
+    const after = get(w).stream;
+    assert.equal(after.retryRound, 0, `${ceiling} ceiling must prevent new retries`);
+    assert.equal(after.admitted, admitted);
+    assert(after.failures.length > 0);
+    assert.equal(after.phase, 'review');
+    if (ceiling === 'cost') assert(after.triggerCostCents !== undefined);
+    else assert.equal(after.stopReason, 'time');
+  }
+});
+
 test('resume boundary excludes the paused portion of a shared driver interval', () => {
   let w = tick(started(), 2); const before = get(w).stream.activeRunMs;
   get(w).stream.clockBoundaryAt = 9500;

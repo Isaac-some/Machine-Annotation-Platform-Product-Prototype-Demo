@@ -111,10 +111,22 @@ function runLimitReason(e: LocalExecutor): StreamRun['stopReason'] | undefined {
 }
 function enforceRunLimits(e: LocalExecutor) {
   const s = e.stream!, reason = runLimitReason(e);
-  if (!reason || s.phase !== 'production' || s.stageRecovery || s.control !== 'automatic' && !s.manualAdmission) return;
+  const targetDraining = s.phase === 'draining' && s.stopReason === 'target';
+  if (!reason || s.phase !== 'production' && !targetDraining || s.stageRecovery || s.control !== 'automatic' && !s.manualAdmission) return;
+  if (targetDraining && reason === 'target') return;
   s.stopReason = reason; s.phase = 'draining';
-  s.reason = `${reason === 'input' ? '达到输入条数上限' : reason === 'time' ? '达到累计运行时长上限' : '达到目标成品量'}：停止新增输入及自动重试，在途任务继续收尾`;
+  s.reason = reason === 'target'
+    ? '达到目标成品量：停止新增输入，在途任务继续收尾；失败数据仍按配置次数自动重试'
+    : `${reason === 'input' ? '达到输入条数上限' : '达到累计运行时长上限'}：停止新增输入及自动重试，在途任务继续收尾`;
   event(s, s.reason);
+}
+function canAutomaticallyRetry(e: LocalExecutor) {
+  const s = e.stream!, p = e.streamPolicy!, reason = runLimitReason(e);
+  if (s.control !== 'automatic' || !s.failures.length || s.retryRound >= p.maxRetries) return false;
+  if (s.costLimitCents !== undefined && s.costCents >= s.costLimitCents || reason === 'input' || reason === 'time') return false;
+  // A goal stops admission only; retry rounds may finish the admitted subset.
+  return s.phase === 'production' && s.admitted === e.inputCount
+    || s.phase === 'draining' && s.stopReason === 'target' && reason === 'target';
 }
 
 export function takeOverStream(w: LocalWorkspace, id: string): LocalWorkspace {
@@ -243,17 +255,21 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       e.runtime!.state = saved.returnPaused ? 'paused' : 'waiting'; s.stageRecovery = undefined;
       s.reason = saved.returnPaused ? '本轮重试及下游处理结束；原有队列与进度已保留，点击继续运行恢复生产' : '本轮重试及下游处理结束，可查看结果';
       event(s, s.reason);
+    } else if (canAutomaticallyRetry(e)) {
+      s.retryRound += 1; s.failures.forEach(t => { s.queues[t.stage].push({ ...t, attempt: t.attempt + 1 }); s.stages[t.stage].failed -= 1; }); s.failures = [];
+      const retryReason = `已取入数据本轮处理结束，启动第 ${s.retryRound} 轮有限自动重试`;
+      if (s.stopReason === 'target') s.reason = `目标成品量已达到，不新增输入；${retryReason}`;
+      event(s, retryReason);
     } else if (s.phase === 'draining' || s.control === 'manual') {
       if (s.triggerCostCents !== undefined && s.drainFinalCents === undefined) s.drainFinalCents = s.costCents;
-      s.manualAdmission = false; s.phase = 'review'; e.runtime!.state = 'waiting'; s.reason = '已取入数据收尾完成；检查运行结果后可调整运行上限并人工继续'; event(s, `收尾结束，累计费用 ¥${(s.costCents / 100).toFixed(2)}`);
+      s.manualAdmission = false; s.phase = 'review'; e.runtime!.state = 'waiting';
+      s.reason = s.stopReason === 'target' && (s.costLimitCents === undefined || s.costCents < s.costLimitCents)
+        ? `目标成品量已达到，已取入数据及有限自动重试已处理结束${s.failures.length ? '；仍有失败数据，可人工补救' : ''}`
+        : '已取入数据收尾完成；检查运行结果后可调整运行上限并人工继续';
+      event(s, `收尾结束，累计费用 ¥${(s.costCents / 100).toFixed(2)}`);
     } else if (s.phase === 'production' && s.admitted === e.inputCount) {
-      if (s.failures.length && s.retryRound < p.maxRetries && (!s.costLimitCents || s.costCents < s.costLimitCents)) {
-        s.retryRound += 1; s.failures.forEach(t => { s.queues[t.stage].push({ ...t, attempt: t.attempt + 1 }); s.stages[t.stage].failed -= 1; }); s.failures = [];
-        event(s, `首轮全链处理结束，启动第 ${s.retryRound} 轮有限自动重试`);
-      } else {
-        s.phase = s.failures.length ? 'review' : 'completed'; e.runtime!.state = s.failures.length ? 'waiting' : 'completed';
-        s.reason = p.targetOutputCount && (s.stages.at(-1)?.outputs ?? 0) < p.targetOutputCount ? '本轮已有输入已处理结束，尚未达到目标成品量；查看结果后可自行决定是否重试失败数据' : s.failures.length ? '有限重试已结束，仍有失败数据，可人工接管原位补救' : '本次输入已处理完成'; event(s, s.reason);
-      }
+      s.phase = s.failures.length ? 'review' : 'completed'; e.runtime!.state = s.failures.length ? 'waiting' : 'completed';
+      s.reason = p.targetOutputCount && (s.stages.at(-1)?.outputs ?? 0) < p.targetOutputCount ? '本轮已有输入已处理结束，尚未达到目标成品量；查看结果后可自行决定是否重试失败数据' : s.failures.length ? '有限重试已结束，仍有失败数据，可人工接管原位补救' : '本次输入已处理完成'; event(s, s.reason);
     }
   }
   sync(next, e); return next;
