@@ -41,6 +41,13 @@ test('no cost ceiling is valid and zero deliverables never create a unit-cost es
   get(w).stream.demoOutcome = 'zero'; get(w).streamPolicy.maxRetries = 0; w = tick(w, 200);
   const s = get(w).stream; assert.equal(s.phase, 'review'); assert.equal(s.stages.at(-1).outputs, 0); assert.equal(s.predicted, undefined);
 });
+test('legacy per-output cost bounds are ignored and cannot block stream startup', () => {
+  const w = fresh(), policy = get(w).streamPolicy;
+  assert.equal(get(w, 'phase2-live').streamPolicy.unitCostMin, undefined);
+  policy.unitCostMin = 0; policy.unitCostMax = -1;
+  assert.doesNotThrow(() => S.validateStreamPolicy(policy, 24));
+  assert.equal(get(S.startStream(w, 'phase2-demo')).stream.phase, 'production');
+});
 test('finite retries follow the full first pass and zero disables automatic retry', () => {
   let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 100);
   const e = get(w); assert.equal(e.stream.retryRound, 0); assert(e.stream.failures.length > 0); assert.equal(e.stream.phase, 'review');
@@ -110,6 +117,28 @@ test('manual continuation requires a higher or removed cap and retains cumulativ
 test('unknown downstream totals stay unknown until their upstream inputs arrive', () => {
  let w=S.startStream(fresh(),'phase2-cost');w=tick(w,4,'phase2-cost');const ids=get(w,'phase2-cost').runtime.batchIds;
  assert.equal(w.batches.find(b=>b.id===ids[1]).total,-1);
+});
+
+test('demo fixture renames update only unchanged sample labels and retain unrelated workspace data', () => {
+  const w = fresh();
+  const delivery = get(w, 'delivery-demo'), phase2 = get(w);
+  delivery.name = '导出体验 · 三环节串联示例';
+  delivery.flows.forEach((flow, index) => { flow.name = ['A · 数据整理', 'B · 标注处理', 'C · 结果复核'][index]; });
+  w.batches.find(batch => batch.id === 5889).name = '时间范围导出 · 示例批次';
+  phase2.name = '流式生产 · 实绩成本估算';
+  phase2.flows.forEach((flow, index) => { flow.name = ['A · 数据整理', 'B · 标注处理', 'C · 结果复核'][index]; });
+  const phaseBatch = w.batches.find(batch => batch.id === phase2.runtime.batchIds[0]);
+  phaseBatch.name = 'A · 数据整理';
+  w.executors.push({ id: 'user-custom', name: '用户自定义', description: '', source: 'selection', flowIds: [], flows: [], runMode: 'batch' });
+  w.batches.push({ ...w.batches[0], id: 9999, name: 'A · 数据整理', executorId: 'user-custom' });
+
+  const migrated = withPhase2Examples(w);
+  assert.equal(migrated.executors.find(item => item.id === 'delivery-demo').name, '桃园结义 · 三环节串联示例');
+  assert.equal(migrated.executors.find(item => item.id === 'phase2-demo').name, '草船借箭 · 流式生产与成本估算');
+  assert.equal(migrated.executors.find(item => item.id === 'phase2-demo').flows[0].name, '桃园结义 · 数据整理');
+  assert.equal(migrated.batches.find(batch => batch.id === 9999).name, 'A · 数据整理');
+  assert.equal(migrated.executors.find(item => item.id === 'user-custom').name, '用户自定义');
+  assert.equal(w.executors.find(item => item.id === 'phase2-demo').name, '流式生产 · 实绩成本估算');
 });
 
 test('paused stage retry isolates normal queues and restores them after downstream recovery', () => {

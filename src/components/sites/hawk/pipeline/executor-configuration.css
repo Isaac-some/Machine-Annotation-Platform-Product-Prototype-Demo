@@ -24,6 +24,19 @@
 .hawk-executor-configuration .hawk-executor-mode .anticon{margin-right:6px;font-size:14px}
 .hawk-executor-configuration .hawk-executor-mode-help{margin:10px 0 0;padding:0;background:transparent;border-radius:0;font-size:12px;color:#64748b;line-height:20px}
 .hawk-executor-configuration .hawk-executor-target-settings{padding:16px;margin-top:16px;background:#f8fafc;border:1px solid #e5eaf1;border-radius:10px}
+.hawk-executor-configuration .hawk-executor-target-settings.hawk-stream-settings{padding:0;margin-top:12px;background:transparent;border:0;border-radius:0}
+.hawk-stream-settings>.ant-alert{margin:0 0 4px;font-size:12px;line-height:20px}
+.hawk-stream-config-group{padding:16px 0;border-top:1px solid #e5eaf1}
+.hawk-stream-config-group:first-of-type{border-top:0}
+.hawk-stream-config-heading{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+.hawk-stream-config-heading>.anticon{flex:none;margin-top:2px;color:#475569;font-size:16px}
+.hawk-stream-config-heading strong{display:block;color:#111827;font-size:14px;font-weight:600;line-height:20px}
+.hawk-stream-config-heading p{margin:3px 0 0;color:#5f6874;font-size:12px;line-height:18px}
+.hawk-stream-config-group .ant-form-item{margin-bottom:0}
+.hawk-stream-config-group>.ant-form-item{max-width:calc(50% - 8px)}
+.hawk-stream-config-group .ant-form-item-extra{font-size:12px;line-height:19px}
+.hawk-stream-observation .hawk-observation-slider{max-width:none;padding:8px 12px 0;margin-bottom:12px}
+.hawk-stream-settings>.ant-typography{margin:4px 0 16px;font-size:12px;line-height:19px;color:#5f6874}
 .hawk-executor-configuration .hawk-executor-rate-formula{background:transparent;color:#64748b;font-size:12px;line-height:20px;margin:10px 0 16px;padding:0}
 .hawk-executor-configuration .hawk-executor-target-settings .hawk-executor-config-note{margin-top:12px}
 .hawk-executor-configuration .hawk-executor-target-settings .ant-alert{margin-top:12px;font-size:12px}

@@ -58,7 +58,7 @@ test('restart, negative spans, missing end and uncertain pauses never inflate co
   assert.equal(uncertain.activeMs,undefined);assert.equal(summarizeRunTime(undefined,0).wallMs,undefined);
 });
 test('cloning carries actual policy but clears the source budget and every runtime record', () => {
-  const w=withPhase2Examples({groups:[],projects:[],executors:[],batches:[]});const source=w.executors.find(e=>e.id==='phase2-live'),before=JSON.stringify(source);
+  const w=withPhase2Examples({groups:[],projects:[],executors:[],batches:[]});const source=w.executors.find(e=>e.id==='phase2-live');source.streamPolicy.unitCostMin=.2;source.streamPolicy.unitCostMax=.4;const before=JSON.stringify(source);
   const cloned=cloneExecutor(w,source.id,{id:'cloned-budget',name:'Clone',includeInput:true,includeConfiguration:true}).executors.at(-1);
-  assert.equal(cloned.streamPolicy.costLimitCents,undefined);assert.equal(cloned.streamPolicy.unitCostMin,.2);assert.equal(cloned.stream,undefined);assert.equal(cloned.runtime.started,false);assert.equal(JSON.stringify(source),before);
+  assert.equal(cloned.streamPolicy.costLimitCents,undefined);assert.equal(cloned.streamPolicy.unitCostMin,.2);assert.equal(cloned.streamPolicy.unitCostMax,.4);assert.equal(cloned.stream,undefined);assert.equal(cloned.runtime.started,false);assert.equal(JSON.stringify(source),before);
 });

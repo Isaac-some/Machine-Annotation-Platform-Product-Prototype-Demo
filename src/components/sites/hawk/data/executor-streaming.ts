@@ -49,9 +49,6 @@ export function validateStreamPolicy(policy: StreamPolicy, count: number) {
     const value = policy[key];
     if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error(`${label}须为正整数，或留空`);
   }
-  if (policy.unitCostMin !== undefined && (!Number.isFinite(policy.unitCostMin) || policy.unitCostMin <= 0)) throw new Error('单条成品成本下限须大于 0，或留空');
-  if (policy.unitCostMax !== undefined && (!Number.isFinite(policy.unitCostMax) || policy.unitCostMax <= 0)) throw new Error('单条成品成本上限须大于 0，或留空');
-  if (policy.unitCostMin !== undefined && policy.unitCostMax !== undefined && policy.unitCostMin > policy.unitCostMax) throw new Error('单条成品成本下限不能高于上限');
   if (!Number.isSafeInteger(policy.maxRetries) || policy.maxRetries < 0) throw new Error('请填写有限的非负整数重试次数，0 表示不自动重试');
   if (policy.reminderRatio !== undefined && (!Number.isFinite(policy.reminderRatio) || policy.reminderRatio <= 0 || policy.reminderRatio >= 100)) throw new Error('提前提醒比例须大于 0 且小于 100%，也可留空');
   if (policy.observationSize !== undefined && (!Number.isSafeInteger(policy.observationSize) || policy.observationSize < 100 || policy.observationSize > 1000)) throw new Error('观察批量须为 100 至 1000 条之间的整数');
