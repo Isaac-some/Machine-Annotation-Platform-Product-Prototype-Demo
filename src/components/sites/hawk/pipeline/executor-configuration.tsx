@@ -24,12 +24,14 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
   const rule = Form.useWatch(['settings', 'filterRule'], form) ?? executorSettings(executor.settings).filterRule;
   const after = Form.useWatch(['settings', 'afterRetries'], form) ?? executorSettings(executor.settings).afterRetries;
   const runMode = Form.useWatch('runMode', form) ?? executor.runMode ?? 'batch';
+  const costLimitCents = Form.useWatch(['streamPolicy', 'costLimitCents'], form);
+  const costLimitAction = Form.useWatch(['streamPolicy', 'costLimitAction'], form) ?? executor.streamPolicy?.costLimitAction ?? 'drain';
   const locked = Boolean(executor.runtime?.started);
   return <Modal title={<div className="hawk-settings-heading"><span>输入及执行器配置</span><p>{locked ? '执行已开始，当前配置仅供查看。' : '配置本次输入、执行方式与交付文件。'}</p></div>} open centered width={840} className="hawk-settings-modal hawk-executor-configuration" okText="保存配置" okButtonProps={{ disabled: locked }} cancelText={locked ? '关闭' : '取消'} onCancel={onCancel} onOk={async () => {
     try { if (locked) return; const values = await form.validateFields(); onSave({ ...values, settings: executorSettings(values.settings) }); }
     catch (issue) { if (issue instanceof Error) setError(issue.message); }
   }}>
-    <Form form={form} disabled={locked} layout="vertical" initialValues={{ deliveryMode: executor.deliveryMode ?? 'sorted', resource: executor.input ?? '', count: executor.inputCount ?? 1, resourceType: executor.resourceType ?? 'video', settings: executorSettings(executor.settings), runMode: executor.runMode ?? 'batch', streamPolicy: executor.streamPolicy ?? { maxRetries: 0, observationSize: 100 } }}>
+    <Form form={form} disabled={locked} layout="vertical" initialValues={{ deliveryMode: executor.deliveryMode ?? 'sorted', resource: executor.input ?? '', count: executor.inputCount ?? 1, resourceType: executor.resourceType ?? 'video', settings: executorSettings(executor.settings), runMode: executor.runMode ?? 'batch', streamPolicy: { costLimitAction: 'drain', maxRetries: 0, observationSize: 100, ...executor.streamPolicy } }}>
       {error && <Alert type="error" role="alert" showIcon message={error} />}
       <section className="hawk-settings-section">
         <div className="hawk-settings-section-heading"><h3>本次输入资源</h3><p>后续批次使用前一步的处理产出。</p></div>
@@ -46,13 +48,15 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
         <div className="hawk-settings-section-heading"><h3>执行设置</h3><p>决定每个环节的结束与接续方式。</p></div>
         <Form.Item name="runMode" label="运行方式"><Radio.Group disabled={locked} options={[{ value: 'batch', label: '整批运行' }, { value: 'stream', label: '流式运行' }]} /></Form.Item>
         {runMode === 'stream' ? <div className="hawk-executor-target-settings hawk-stream-settings">
-          <Alert type="info" showIcon message="配置完成即可运行。成本、输入量或累计时长上限触发时停止新增输入和自动重试；目标成品量达标只停止新增输入，失败数据仍可按配置次数重试。在途任务继续收尾。" />
+          <Alert type="info" showIcon message={`配置完成即可运行。${costLimitAction === 'continue' ? '真实成本触顶后仅提醒并继续生产。' : '真实成本触顶后停止新增输入和自动重试。'}输入量或累计时长上限仍会停止新增输入及自动重试；目标成品量达标只停止新增输入，失败数据仍可按配置次数重试。在途任务继续收尾。`} />
           <section className="hawk-stream-config-group">
-            <div className="hawk-stream-config-heading"><DollarCircleOutlined aria-hidden="true" /><div><strong>成本控制</strong><p>费用上限独立于持续更新的成本估算；提醒不会暂停运行。</p></div></div>
+            <div className="hawk-stream-config-heading"><DollarCircleOutlined aria-hidden="true" /><div><strong>成本控制</strong><p>费用预测只作参考；只有真实费用触顶时才按此设置处理。</p></div></div>
             <div className="hawk-executor-config-grid">
               <Form.Item name={['streamPolicy', 'costLimitCents']} label="总成本上限（选填，元）" getValueProps={value => ({ value: value === undefined ? undefined : value / 100 })} getValueFromEvent={value => value === null || value === undefined ? undefined : Math.round(value * 100)}><InputNumber disabled={locked} min={0.01} precision={2} placeholder="留空表示不设上限" style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name={['streamPolicy', 'reminderRatio']} label="费用达到上限的多少时提醒（选填）" extra="例如上限 ¥100、填写 80%，累计费用达到 ¥80 时提醒。留空关闭提醒；需先设置成本上限。"><InputNumber disabled={locked} min={0.01} max={99.99} suffix="%" placeholder="例如 80" style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name={['streamPolicy', 'costLimitAction']} label="触碰成本上限时"><Select disabled={locked || costLimitCents === undefined} options={[{ value: 'drain', label: '停止新增并收尾' }, { value: 'continue', label: '仅提醒，继续生产' }]} /></Form.Item>
             </div>
+            <Form.Item name={['streamPolicy', 'reminderRatio']} label="费用达到上限的多少时提前提醒（选填）" extra="按累计实际费用触发；提醒强度可在“通知与成本反馈”中配置。预估费用不触发停机。"><InputNumber disabled={locked} min={0.01} max={99.99} suffix="%" placeholder="例如 80；留空关闭" style={{ width: '100%' }} /></Form.Item>
+            <Typography.Paragraph className="hawk-executor-config-note">{costLimitAction === 'continue' ? '触顶后按“通知与成本反馈”中配置的成本上限提醒强度提示，并继续新增输入和执行配置次数内的自动重试。' : '触顶后停止新增输入和自动重试；已取入及在途任务继续完成后续环节，最终费用可能超过上限。'}</Typography.Paragraph>
           </section>
           <section className="hawk-stream-config-group">
             <div className="hawk-stream-config-heading"><DatabaseOutlined aria-hidden="true" /><div><strong>输入与目标成品</strong><p>可分别限制本轮取入量和新增成品量；留空表示不按该项限制。</p></div></div>

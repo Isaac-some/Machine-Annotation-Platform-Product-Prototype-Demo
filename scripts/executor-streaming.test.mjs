@@ -36,6 +36,49 @@ test('optional cost ceiling stops new admission, drains in-flight work and leave
   w = S.continueStreamManually(w, 'phase2-demo'); w = tick(w, 200);
   assert.equal(get(w).stream.admitted, 24); assert.equal(get(w).stream.phase, 'completed');
 });
+test('continue-on-cap keeps admitting and retrying while recording configured reminder strength', () => {
+  let w = fresh(); const e = get(w);
+  e.streamPolicy.costLimitCents = 432; e.streamPolicy.costLimitAction = 'continue'; e.streamPolicy.reminderRatio = 60;
+  e.notification = { baseline: 3, reminder: 2, stop: 1, recipients: '创建人' };
+  w = S.startStream(w, e.id);
+  let admittedAtTrigger = 0;
+  for (let i = 0; i < 200 && get(w).stream.phase !== 'completed'; i++) {
+    w = tick(w, 1);
+    const s = get(w).stream;
+    if (s.triggerCostCents !== undefined && admittedAtTrigger === 0) admittedAtTrigger = s.admitted;
+  }
+  const result = get(w), prompt = result.stream.costPrompts.find(item => item.text.includes('达到成本上限'));
+  assert.equal(result.stream.triggerCostAction, 'continue');
+  assert.equal(prompt.notificationLevel, 3);
+  assert.equal(result.stream.phase, 'completed');
+  assert.equal(result.stream.admitted, 24);
+  assert.equal(result.stream.retryRound, 1);
+  assert(result.stream.costCents > result.stream.triggerCostCents);
+  assert.equal(result.stream.drainFinalCents, undefined);
+  assert(admittedAtTrigger > 0 && admittedAtTrigger < 24);
+});
+test('continue-on-cap still allows explicit manual recovery of failed stages', () => {
+  let w = fresh(); const e = get(w);
+  e.streamPolicy.costLimitCents = 1; e.streamPolicy.costLimitAction = 'continue'; e.streamPolicy.maxRetries = 0;
+  w = S.startStream(w, e.id); w = tick(w, 200);
+  const before = get(w), failed = before.stream.failures[0];
+  assert(failed); assert.equal(before.stream.phase, 'review'); assert(before.stream.costCents >= 1);
+  w = S.retryStreamStage(w, e.id, failed.stage);
+  assert(get(w).stream.stageRecovery);
+  w = tick(w, 100);
+  assert.equal(get(w).stream.stageRecovery, undefined);
+  assert(get(w).stream.costCents > before.stream.costCents);
+});
+test('manual takeover still records a cap notification when admitted work crosses the limit while draining', () => {
+  let w = fresh(); const e = get(w);
+  e.streamPolicy.costLimitCents = 50; e.streamPolicy.costLimitAction = 'drain';
+  e.notification = { baseline: 1, reminder: 1, stop: 4, recipients: '创建人' };
+  w = S.startStream(w, e.id); w = tick(w, 2); w = S.takeOverStream(w, e.id);
+  for (let i = 0; i < 50 && get(w).stream.triggerCostCents === undefined; i++) w = tick(w);
+  const prompt = get(w).stream.costPrompts.find(item => item.text.includes('达到成本上限'));
+  assert(prompt); assert.equal(prompt.notificationLevel, 4);
+  assert.equal(get(w).stream.phase, 'draining');
+});
 test('no cost ceiling is valid and zero deliverables never create a unit-cost estimate', () => {
   let w = started(); assert.equal(get(w).stream.costLimitCents, undefined);
   get(w).stream.demoOutcome = 'zero'; get(w).streamPolicy.maxRetries = 0; w = tick(w, 200);

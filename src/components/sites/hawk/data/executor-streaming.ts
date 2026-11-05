@@ -4,6 +4,7 @@ import type { RunTimeTrace } from './executor-run-time';
 
 export type StreamPolicy = {
   costLimitCents?: number;
+  costLimitAction?: 'drain' | 'continue';
   inputLimit?: number;
   runtimeLimitMs?: number;
   targetOutputCount?: number;
@@ -33,18 +34,20 @@ export type StreamRun = {
   };
   phase: 'production' | 'draining' | 'review' | 'completed';
   control: 'automatic' | 'manual'; admitted: number; settledInputs: number; queues: StreamToken[][]; failures: StreamToken[];
-  stages: StreamStage[]; costCents: number; costLimitCents?: number; triggerCostCents?: number; drainFinalCents?: number; predicted?: number;
+  stages: StreamStage[]; costCents: number; costLimitCents?: number; triggerCostCents?: number; triggerCostAction?: 'drain' | 'continue'; drainFinalCents?: number; predicted?: number;
   inputMetrics: Record<number, { costCents: number; finalOutputs: number }>; settledRootIds: number[];
   reminded: boolean; retryRound: number; reason?: string; preparation?: number; recoveryRuns: number;
   events: { at: number; text: string }[]; pausedStages?: number[]; manualAdmission?: boolean;
-  costPrompts?: { id: string; text: string; sampled: boolean }[]; demoOutcome?: 'normal' | 'zero';
+  costPrompts?: { id: string; text: string; sampled: boolean; notificationLevel?: number }[]; demoOutcome?: 'normal' | 'zero';
 };
 const batchesFor = (w: LocalWorkspace, e: LocalExecutor) => (e.runtime?.batchIds ?? []).map(id => w.batches.find(b => b.id === id)!);
-const costPrompt = (s: StreamRun, text: string) => { const id = `cost-${(s.costPrompts?.length ?? 0) + 1}`; s.costPrompts ??= []; s.costPrompts.push({ id, text, sampled: s.costPrompts.length % 2 === 0 }); };
+const notificationLevel = (e: LocalExecutor, kind: 'reminder' | 'stop') => Math.max(e.notification?.baseline ?? 1, e.notification?.[kind] ?? (kind === 'reminder' ? 1 : 2));
+const costPrompt = (s: StreamRun, text: string, level: number) => { const id = `cost-${(s.costPrompts?.length ?? 0) + 1}`; s.costPrompts ??= []; s.costPrompts.push({ id, text, sampled: s.costPrompts.length % 2 === 0, notificationLevel: level }); };
 const event = (s: StreamRun, text: string) => { s.events.unshift({ at: Date.now(), text }); };
 export function validateStreamPolicy(policy: StreamPolicy, count: number) {
   if (!Number.isSafeInteger(count) || count < 1) throw new Error('请先配置正整数输入数量');
   if (policy.costLimitCents !== undefined && (!Number.isSafeInteger(policy.costLimitCents) || policy.costLimitCents <= 0)) throw new Error('总成本上限须为大于 0 的金额，或留空');
+  if (policy.costLimitAction !== undefined && !['drain', 'continue'].includes(policy.costLimitAction)) throw new Error('请选择触碰成本上限后的处理方式');
   for (const [key, label] of [['inputLimit', '输入条数上限'], ['runtimeLimitMs', '运行时长上限'], ['targetOutputCount', '目标成品量']] as const) {
     const value = policy[key];
     if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error(`${label}须为正整数，或留空`);
@@ -120,7 +123,7 @@ function enforceRunLimits(e: LocalExecutor) {
 function canAutomaticallyRetry(e: LocalExecutor) {
   const s = e.stream!, p = e.streamPolicy!, reason = runLimitReason(e);
   if (s.control !== 'automatic' || !s.failures.length || s.retryRound >= p.maxRetries) return false;
-  if (s.costLimitCents !== undefined && s.costCents >= s.costLimitCents || reason === 'input' || reason === 'time') return false;
+  if (((p.costLimitAction ?? 'drain') !== 'continue' && s.costLimitCents !== undefined && s.costCents >= s.costLimitCents) || reason === 'input' || reason === 'time') return false;
   // A goal stops admission only; retry rounds may finish the admitted subset.
   return s.phase === 'production' && s.admitted === e.inputCount
     || s.phase === 'draining' && s.stopReason === 'target' && reason === 'target';
@@ -146,7 +149,7 @@ export function retryStreamStage(w: LocalWorkspace, id: string, stageIndex: numb
   if (e.runtime?.state !== 'paused' && !['review', 'completed'].includes(s.phase)) throw new Error('请先暂停执行器，再重试该批次失败数据');
   if (s.phase === 'draining') throw new Error('请等待已取入数据收尾完成，再重试');
   if (e.streamPolicy?.runtimeLimitMs !== undefined && (s.activeRunMs ?? 0) >= e.streamPolicy.runtimeLimitMs) throw new Error('请先在投入与产量试算中提高或取消运行时长上限，再重试');
-  if (s.costLimitCents !== undefined && s.costCents >= s.costLimitCents) throw new Error('请先在费用详情中提高或取消成本上限，再重试');
+  if ((e.streamPolicy?.costLimitAction ?? 'drain') !== 'continue' && s.costLimitCents !== undefined && s.costCents >= s.costLimitCents) throw new Error('请先在费用详情中提高或取消成本上限，再重试');
   s.stageRecovery = { stage: stageIndex, preparation: 0, queues: s.queues, phase: s.phase, control: s.control, manualAdmission: s.manualAdmission, pausedStages: s.pausedStages, returnPaused: e.runtime?.state === 'paused' };
   s.queues = s.queues.map(() => []);
   failed.forEach(token => s.queues[stageIndex].push({ ...token, attempt: token.attempt + 1 }));
@@ -222,11 +225,18 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
         if (i + 1 < s.queues.length) s.queues[i + 1].push({ key, root: token.root, stage: i + 1, attempt: 0 });
       }
     }
-    if (s.costLimitCents && s.costCents >= s.costLimitCents && s.triggerCostCents === undefined && s.control === 'automatic') {
-      s.triggerCostCents = s.costCents; s.phase = 'draining'; s.reason = '达到成本上限：已停止新增取入与新增重试，已取入数据继续处理'; event(s, s.reason); costPrompt(s, s.reason);
+    if (s.costLimitCents && s.costCents >= s.costLimitCents && s.triggerCostCents === undefined) {
+      const action = p.costLimitAction ?? 'drain';
+      s.triggerCostCents = s.costCents; s.triggerCostAction = action;
+      const message = action === 'drain'
+        ? '达到成本上限：已停止新增取入与新增自动重试，已取入数据继续收尾'
+        : '达到成本上限：按配置提醒并继续生产及有限自动重试';
+      if (s.phase === 'production') s.reason = message;
+      if (action === 'drain' && s.phase === 'production') s.phase = 'draining';
+      event(s, message); costPrompt(s, message, notificationLevel(e, 'stop'));
     }
   }
-  if (s.costLimitCents && p.reminderRatio !== undefined && !s.reminded && s.costCents >= s.costLimitCents * p.reminderRatio / 100) { s.reminded = true; costPrompt(s, '成本上限提前提醒'); event(s, `费用达到上限 ${p.reminderRatio}% 的提前提醒；继续运行`); }
+  if (s.costLimitCents && p.reminderRatio !== undefined && !s.reminded && s.costCents >= s.costLimitCents * p.reminderRatio / 100) { s.reminded = true; costPrompt(s, '成本上限提前提醒', notificationLevel(e, 'reminder')); event(s, `费用达到上限 ${p.reminderRatio}% 的提前提醒；继续运行`); }
   enforceRunLimits(e);
   const limit = e.inputCount!;
   if (s.phase === 'production' && (s.control === 'automatic' || s.manualAdmission) && !s.pausedStages?.some(i => i === 0 || s.queues[i].length > 0) && s.admitted < limit) {
@@ -258,7 +268,7 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       if (s.stopReason === 'target') s.reason = `目标成品量已达到，不新增输入；${retryReason}`;
       event(s, retryReason);
     } else if (s.phase === 'draining' || s.control === 'manual') {
-      if (s.triggerCostCents !== undefined && s.drainFinalCents === undefined) s.drainFinalCents = s.costCents;
+      if (s.triggerCostAction === 'drain' && s.drainFinalCents === undefined) s.drainFinalCents = s.costCents;
       s.manualAdmission = false; s.phase = 'review'; e.runtime!.state = 'waiting';
       s.reason = s.stopReason === 'target' && (s.costLimitCents === undefined || s.costCents < s.costLimitCents)
         ? `目标成品量已达到，已取入数据及有限自动重试已处理结束${s.failures.length ? '；仍有失败数据，可人工补救' : ''}`
@@ -283,7 +293,7 @@ export function continueStreamManually(w: LocalWorkspace, id: string): LocalWork
  const next = cloneWorkspace(w), e = next.executors.find(e => e.id === id)!, s = e?.stream;
  if (!s || s.phase !== 'review' || s.admitted >= (e.inputCount ?? 0)) throw new Error('当前没有可继续的剩余输入');
  if (runLimitReason(e)) throw new Error('请先在投入与产量试算中提高或取消已达到的运行上限；目标成品量已达到时无需继续取入');
- if (s.costLimitCents !== undefined && s.costLimitCents <= s.costCents) throw new Error('请先在成本计算器中提高或取消成本上限');
+ if ((e.streamPolicy?.costLimitAction ?? 'drain') !== 'continue' && s.costLimitCents !== undefined && s.costLimitCents <= s.costCents) throw new Error('请先在成本计算器中提高或取消成本上限');
  s.control = 'automatic'; s.phase = 'production'; s.manualAdmission = true; s.triggerCostCents = undefined; s.drainFinalCents = undefined;
  s.reason = '人工决定继续本流水线；下游结果不会自动返回，累计费用继续计算'; e.runtime!.state = 'running'; s.clockBoundaryAt = Date.now(); event(s, s.reason); return next;
 }

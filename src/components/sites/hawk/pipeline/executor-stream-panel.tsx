@@ -41,6 +41,7 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
   const stages = e.flows.map((flow, index) => ({ key: index, name: flow.name, ...(s?.stages[index] ?? { processed: 0, failed: 0, outputs: 0, costCents: 0 }), queued: (s?.queues[index]?.length ?? 0) + (s?.stageRecovery?.queues[index]?.length ?? 0) }));
   const finalOutputs = stages.at(-1)?.outputs ?? 0, observed = s?.settledInputs ?? 0, total = e.inputCount ?? 0;
   const cost = s?.costCents ?? 0, cap = s?.costLimitCents ?? e.streamPolicy?.costLimitCents;
+  const costLimitBlocks = Boolean(cap && cost >= cap && (e.streamPolicy?.costLimitAction ?? 'drain') !== 'continue');
   const retry = (index: number) => {
     const failed = s?.failures.filter(token => token.stage === index).length ?? 0;
     if (s?.stageRecovery) { msg.info('已有失败数据正在重试，请等待本轮结束'); return; }
@@ -50,7 +51,7 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
   };
   return <>
     {holder}<button type="button" className="hawk-executor-cost-summary" aria-label="累计费用与运行详情" onClick={() => setOpen(true)}>
-      <span>累计费用</span><span className="hawk-executor-cost-link">运行详情 ↗</span><strong>{money(cost)}</strong><small>{cap ? `成本上限 ${money(cap)}` : '未设成本上限'}</small>
+      <span>累计费用</span><span className="hawk-executor-cost-link">运行详情 ↗</span><strong>{money(cost)}</strong><small>{cap ? `成本上限 ${money(cap)} · 触顶${(e.streamPolicy?.costLimitAction ?? 'drain') === 'continue' ? '仅提醒继续' : '停止新增'}` : '未设成本上限'}</small>
     </button>
     <Modal title="累计费用与运行详情" className="hawk-stream-detail-modal" centered open={open} onCancel={() => setOpen(false)} footer={<Button onClick={() => setOpen(false)}>关闭</Button>} width={1120}>
       <section className="hawk-stream-panel" aria-label="执行器成本与运行">
@@ -62,8 +63,8 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
           </div>
         {s?.reason && <Alert type={s.phase === 'draining' || s.phase === 'review' ? 'warning' : 'info'} showIcon message={s.reason} />}
         {s?.reminded && <Alert type="warning" showIcon message={`费用已达到成本上限的 ${e.streamPolicy?.reminderRatio}%，触发提前提醒；提醒不会暂停运行。`} />}
-        {s?.triggerCostCents !== undefined && <Descriptions size="small" bordered column={3} items={[{ key: 'trigger', label: '触发费用', children: money(s.triggerCostCents) }, { key: 'extra', label: '收尾新增费用', children: money((s.drainFinalCents ?? cost) - s.triggerCostCents) }, { key: 'total', label: s.drainFinalCents === undefined ? '当前费用' : '收尾最终费用', children: money(s.drainFinalCents ?? cost) }]} />}
-        {s?.phase === 'review' && s.admitted < total && !(e.streamPolicy?.targetOutputCount && finalOutputs >= e.streamPolicy.targetOutputCount) && <div className="hawk-stream-review-action"><span>{s.stopReason || cap && cost >= cap ? '已取入数据全部收尾；请先调整已达到的运行上限，再手动继续。' : '已取入数据全部收尾，可继续处理剩余输入。'}</span><Button type="primary" disabled={Boolean(s.stopReason || cap && cost >= cap)} onClick={() => act(continueStreamManually)}>人工继续生产</Button></div>}
+        {s?.triggerCostCents !== undefined && <Descriptions size="small" bordered column={3} items={[{ key: 'trigger', label: '触发费用', children: money(s.triggerCostCents) }, { key: 'extra', label: s.triggerCostAction === 'continue' ? '触顶后新增费用' : '收尾新增费用', children: money((s.drainFinalCents ?? cost) - s.triggerCostCents) }, { key: 'total', label: s.drainFinalCents === undefined ? '当前费用' : '收尾最终费用', children: money(s.drainFinalCents ?? cost) }]} />}
+        {s?.phase === 'review' && s.admitted < total && !(e.streamPolicy?.targetOutputCount && finalOutputs >= e.streamPolicy.targetOutputCount) && <div className="hawk-stream-review-action"><span>{s.stopReason || costLimitBlocks ? '已取入数据全部收尾；请先调整已达到的运行上限，再手动继续。' : '已取入数据全部收尾，可继续处理剩余输入。'}</span><Button type="primary" disabled={Boolean(s.stopReason || costLimitBlocks)} onClick={() => act(continueStreamManually)}>人工继续生产</Button></div>}
         {(s?.stageRecovery?.preparation ?? s?.preparation) !== undefined && <div><Typography.Text>失败输入准备进度</Typography.Text><Progress percent={s?.stageRecovery?.preparation ?? s?.preparation} /></div>}
         <div className="hawk-stream-table-heading"><h3>生产环节</h3><span>按批次重试失败数据，成功后继续下游</span></div>
         <Table size="small" pagination={false} rowKey="key" dataSource={stages} scroll={{ x: 960 }} columns={[
