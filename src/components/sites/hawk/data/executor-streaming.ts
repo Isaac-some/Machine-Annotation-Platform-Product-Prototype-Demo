@@ -3,11 +3,13 @@ import { cloneWorkspace } from './delivery';
 import type { RunTimeTrace } from './executor-run-time';
 
 export type StreamPolicy = {
+  targetOutputMode?: 'count' | 'percent';
   costLimitCents?: number;
   costLimitAction?: 'drain' | 'continue';
   inputLimit?: number;
   runtimeLimitMs?: number;
   targetOutputCount?: number;
+  targetOutputPercent?: number;
   unitCostMin?: number;
   unitCostMax?: number;
   maxRetries: number;
@@ -40,6 +42,9 @@ export type StreamRun = {
   events: { at: number; text: string }[]; pausedStages?: number[]; manualAdmission?: boolean;
   costPrompts?: { id: string; text: string; sampled: boolean; notificationLevel?: number }[]; demoOutcome?: 'normal' | 'zero';
 };
+export function effectiveTargetOutputCount(policy: StreamPolicy, inputCount: number) {
+  return policy.targetOutputPercent === undefined ? policy.targetOutputCount : Math.ceil(inputCount * policy.targetOutputPercent / 100);
+}
 const batchesFor = (w: LocalWorkspace, e: LocalExecutor) => (e.runtime?.batchIds ?? []).map(id => w.batches.find(b => b.id === id)!);
 const notificationLevel = (e: LocalExecutor, kind: 'reminder' | 'stop') => Math.max(e.notification?.baseline ?? 1, e.notification?.[kind] ?? (kind === 'reminder' ? 1 : 2));
 const costPrompt = (s: StreamRun, text: string, level: number) => { const id = `cost-${(s.costPrompts?.length ?? 0) + 1}`; s.costPrompts ??= []; s.costPrompts.push({ id, text, sampled: s.costPrompts.length % 2 === 0, notificationLevel: level }); };
@@ -52,6 +57,8 @@ export function validateStreamPolicy(policy: StreamPolicy, count: number) {
     const value = policy[key];
     if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error(`${label}须为正整数，或留空`);
   }
+  if (policy.targetOutputPercent !== undefined && (!Number.isFinite(policy.targetOutputPercent) || policy.targetOutputPercent <= 0 || policy.targetOutputPercent > 100)) throw new Error('目标成品比例须大于 0 且不超过 100%，或留空');
+  if (policy.targetOutputPercent !== undefined && policy.targetOutputCount !== undefined) throw new Error('目标成品量只能设置数量或比例其中一种');
   if (!Number.isSafeInteger(policy.maxRetries) || policy.maxRetries < 0) throw new Error('请填写有限的非负整数重试次数，0 表示不自动重试');
   if (policy.reminderRatio !== undefined && (!Number.isFinite(policy.reminderRatio) || policy.reminderRatio <= 0 || policy.reminderRatio >= 100)) throw new Error('提前提醒比例须大于 0 且小于 100%，也可留空');
   if (policy.observationSize !== undefined && (!Number.isSafeInteger(policy.observationSize) || policy.observationSize < 100 || policy.observationSize > 1000)) throw new Error('观察批量须为 100 至 1000 条之间的整数');
@@ -91,12 +98,13 @@ export function setStreamLimits(w: LocalWorkspace, id: string, limits: StreamLim
 }
 /** Contract only: upstream estimates supplemental inputs; this prototype never calculates or submits them. */
 export function buildUpstreamInputRequest(e: LocalExecutor) {
-  if (!e.streamPolicy?.targetOutputCount) return undefined;
+  const targetOutputCount = e.streamPolicy && effectiveTargetOutputCount(e.streamPolicy, e.inputCount ?? 0);
+  if (!targetOutputCount) return undefined;
   return {
-    schemaVersion: 1, executorId: e.id, targetOutputCount: e.streamPolicy.targetOutputCount,
+    schemaVersion: 1, executorId: e.id, targetOutputCount,
     deliveredOutputCount: e.stream?.stages.at(-1)?.outputs ?? 0,
     observation: { settledInputCount: e.stream?.settledInputs ?? 0, settledOutputCount: e.stream?.settledRootIds.reduce((sum, root) => sum + (e.stream?.inputMetrics[root]?.finalOutputs ?? 0), 0) ?? 0, completedAutomaticRetryRounds: e.stream?.retryRound ?? 0, manualRecoveryRuns: e.stream?.recoveryRuns ?? 0 },
-    retryPolicy: { maxRetries: e.streamPolicy.maxRetries, scope: 'failed-stage-then-downstream' as const, manualRetryRequiresUserAction: true },
+    retryPolicy: { maxRetries: e.streamPolicy!.maxRetries, scope: 'failed-stage-then-downstream' as const, manualRetryRequiresUserAction: true },
     estimateStatus: 'awaiting-upstream' as const,
   };
 }
@@ -107,7 +115,8 @@ function runLimitReason(e: LocalExecutor): StreamRun['stopReason'] | undefined {
   const p = e.streamPolicy!, s = e.stream!;
   if (p.inputLimit !== undefined && s.admitted >= p.inputLimit) return 'input';
   if (p.runtimeLimitMs !== undefined && (s.activeRunMs ?? 0) >= p.runtimeLimitMs) return 'time';
-  if (p.targetOutputCount !== undefined && (s.stages.at(-1)?.outputs ?? 0) >= p.targetOutputCount) return 'target';
+  const targetOutputCount = effectiveTargetOutputCount(p, e.inputCount ?? 0);
+  if (targetOutputCount !== undefined && (s.stages.at(-1)?.outputs ?? 0) >= targetOutputCount) return 'target';
 }
 function enforceRunLimits(e: LocalExecutor) {
   const s = e.stream!, reason = runLimitReason(e);
@@ -276,7 +285,8 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       event(s, `收尾结束，累计费用 ¥${(s.costCents / 100).toFixed(2)}`);
     } else if (s.phase === 'production' && s.admitted === e.inputCount) {
       s.phase = s.failures.length ? 'review' : 'completed'; e.runtime!.state = s.failures.length ? 'waiting' : 'completed';
-      s.reason = p.targetOutputCount && (s.stages.at(-1)?.outputs ?? 0) < p.targetOutputCount ? '本轮已有输入已处理结束，尚未达到目标成品量；查看结果后可自行决定是否重试失败数据' : s.failures.length ? '有限重试已结束，仍有失败数据，可人工接管原位补救' : '本次输入已处理完成'; event(s, s.reason);
+      const targetOutputCount = effectiveTargetOutputCount(p, e.inputCount ?? 0);
+      s.reason = targetOutputCount && (s.stages.at(-1)?.outputs ?? 0) < targetOutputCount ? '本轮已有输入已处理结束，尚未达到目标成品量；查看结果后可自行决定是否重试失败数据' : s.failures.length ? '有限重试已结束，仍有失败数据，可人工接管原位补救' : '本次输入已处理完成'; event(s, s.reason);
     }
   }
   sync(next, e); return next;

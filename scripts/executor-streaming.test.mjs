@@ -291,6 +291,19 @@ test('output goal stops new admission; supplemental-input contract contains evid
   }
 });
 
+test('percentage output goal uses the fixed input snapshot and converts upward to whole products', () => {
+  const policy = { maxRetries: 0, targetOutputMode: 'percent', targetOutputPercent: 8.4 };
+  assert.equal(S.effectiveTargetOutputCount(policy, 24), 3);
+  assert.equal(S.effectiveTargetOutputCount({ maxRetries: 0, targetOutputMode: 'count', targetOutputCount: 5 }, 24), 5);
+  assert.throws(() => S.validateStreamPolicy({ ...policy, targetOutputCount: 5 }, 24));
+  assert.throws(() => S.validateStreamPolicy({ maxRetries: 0, targetOutputPercent: 100.1 }, 24));
+  let w = fresh(); Object.assign(get(w).streamPolicy, policy);
+  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  assert.equal(get(w).stream.stopReason, 'target');
+  assert(get(w).stream.admitted < 24);
+  assert(get(w).stream.stages.at(-1).outputs >= 3);
+});
+
 const targetReached = (policy = {}) => {
   let w = fresh();
   Object.assign(get(w).streamPolicy, { targetOutputCount: 8, maxRetries: 2 }, policy);

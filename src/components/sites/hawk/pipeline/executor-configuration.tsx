@@ -26,6 +26,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
   const runMode = Form.useWatch('runMode', form) ?? executor.runMode ?? 'batch';
   const costLimitCents = Form.useWatch(['streamPolicy', 'costLimitCents'], form);
   const costLimitAction = Form.useWatch(['streamPolicy', 'costLimitAction'], form) ?? executor.streamPolicy?.costLimitAction ?? 'drain';
+  const targetOutputMode = Form.useWatch(['streamPolicy', 'targetOutputMode'], form) ?? 'count';
   const locked = Boolean(executor.runtime?.started);
   return <Modal title={<div className="hawk-settings-heading"><span>输入及执行器配置</span><p>{locked ? '执行已开始，当前配置仅供查看。' : '配置本次输入、执行方式与交付文件。'}</p></div>} open centered width={840} className="hawk-settings-modal hawk-executor-configuration" okText="保存配置" okButtonProps={{ disabled: locked }} cancelText={locked ? '关闭' : '取消'} onCancel={onCancel} onOk={async () => {
     try { if (locked) return; const values = await form.validateFields(); onSave({ ...values, settings: executorSettings(values.settings) }); }
@@ -62,7 +63,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
             <div className="hawk-stream-config-heading"><DatabaseOutlined aria-hidden="true" /><div><strong>输入与目标成品</strong><p>可分别限制本轮取入量和新增成品量；留空表示不按该项限制。</p></div></div>
             <div className="hawk-executor-config-grid">
               <Form.Item name={['streamPolicy', 'inputLimit']} label="最多取入原始数据（选填，条）" getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="留空处理本轮全部已有输入" style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name={['streamPolicy', 'targetOutputCount']} label="目标成品量（选填，份）" extra="预计最终成品数达到该值后停止新增输入；在途任务继续收尾，失败数据仍按已设次数重试。" getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="例如 1,000" style={{ width: '100%' }} /></Form.Item>
+              <Form.Item label="目标成品量（选填）"><Radio.Group disabled={locked} value={targetOutputMode} options={[{ value: 'count', label: '数量' }, { value: 'percent', label: '占本轮输入比例' }]} onChange={event => { form.setFieldValue(['streamPolicy', 'targetOutputMode'], event.target.value); form.setFieldValue(['streamPolicy', 'targetOutputCount'], undefined); form.setFieldValue(['streamPolicy', 'targetOutputPercent'], undefined); }} />{targetOutputMode === 'percent' ? <Form.Item name={['streamPolicy', 'targetOutputPercent']} noStyle getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={0.1} max={100} precision={1} suffix="%" placeholder="例如 80.0" style={{ width: '100%', marginTop: 8 }} /></Form.Item> : <Form.Item name={['streamPolicy', 'targetOutputCount']} noStyle getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="例如 1,000 份" style={{ width: '100%', marginTop: 8 }} /></Form.Item>}</Form.Item>
             </div>
           </section>
           <section className="hawk-stream-config-group">
@@ -75,7 +76,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
           </section>
           <section className="hawk-stream-config-group hawk-stream-observation">
             <div className="hawk-stream-config-heading"><BarChartOutlined aria-hidden="true" /><div><strong>估算刷新批量</strong><p>每累计处理到设定条数后更新一次成本与产量估算，不影响生产启动或取入量。</p></div></div>
-            <Form.Item name={['streamPolicy', 'observationSize']} label="每处理多少条后更新估算" className="hawk-observation-slider"><Slider disabled={locked} min={100} max={1000} step={100} marks={{ 100: { style: { transform: 'none' }, label: '100 条' }, 500: '500 条', 1000: { style: { transform: 'translateX(-100%)' }, label: '1,000 条' } }} /></Form.Item>
+            <Form.Item name={['streamPolicy', 'observationSize']} label="每处理多少条后更新估算" className="hawk-observation-slider"><Slider disabled={locked} min={100} max={1000} step={1} marks={{ 100: { style: { transform: 'none' }, label: '100 条' }, 500: '500 条', 1000: { style: { transform: 'translateX(-100%)' }, label: '1,000 条' } }} /></Form.Item>
           </section>
           <Typography.Paragraph type="secondary">成本预测按已收尾输入及最终成品配对估算，包含失败与重试投入；样本不足时显示原因，不保证后续输入与样本相同。</Typography.Paragraph>
         </div> : <><div className="hawk-settings-row">
@@ -85,6 +86,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
             <p className="hawk-executor-mode-help">{modeHelp[mode as ExecutorSettings['mode']]}</p>
           </div>
         </div>
+        <Form.Item name={['settings', 'qualityCheckRate']} label="质检抽样比例（演示设置）" extra="整批质检比例可在 1.0%–10.0% 内调整；当前原型仅保存设置，未接入质检执行。"><InputNumber min={1} max={10} precision={1} step={0.1} suffix="%" style={{ maxWidth: 240, width: '100%' }} /></Form.Item>
         {mode === 'target' && <div className="hawk-executor-target-settings">
           <div className="hawk-executor-config-grid">
             <Form.Item name={['settings', 'targetRate']} label="成功率达到多少即可放行" rules={[{ required: true, type: 'number', min: 0, max: 100, message: '请输入 0–100 之间的成功率' }]}><InputNumber min={0} max={100} precision={1} suffix="%" style={{ width: '100%' }} /></Form.Item>

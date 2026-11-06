@@ -89,7 +89,7 @@ export function ExecutorWorkbench() {
       p?.costLimitCents ? { label: '成本上限', value: `¥${(p.costLimitCents / 100).toFixed(2)}` } : undefined,
       p?.inputLimit ? { label: '最多取入', value: `${p.inputLimit.toLocaleString()} 条` } : undefined,
       p?.runtimeLimitMs ? { label: '实际运行上限', value: `${(p.runtimeLimitMs / 3600000).toLocaleString()} 小时` } : undefined,
-      p?.targetOutputCount ? { label: '目标成品', value: `${p.targetOutputCount.toLocaleString()} 份` } : undefined,
+      p?.targetOutputPercent !== undefined ? { label: '目标成品', value: `${p.targetOutputPercent.toFixed(1)}% 输入量` } : p?.targetOutputCount ? { label: '目标成品', value: `${p.targetOutputCount.toLocaleString()} 份` } : undefined,
     ].filter(item => item !== undefined);
     Modal.confirm({ title: '确认本轮输入与运行范围', okText: '确认一键运行', cancelText: '检查配置', width: 560,
       content: <div className="hawk-executor-start-notice">

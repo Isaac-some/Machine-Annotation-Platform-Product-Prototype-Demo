@@ -1,6 +1,7 @@
 export interface ExecutorSettings {
   mode: 'default' | 'rigorous' | 'target';
   targetRate: number;
+  qualityCheckRate?: number;
   filterRule: 'exclude' | 'include';
   maxRetries: number;
   afterRetries: 'wait' | 'continue';
@@ -8,7 +9,7 @@ export interface ExecutorSettings {
 }
 
 export const DEFAULT_EXECUTOR_SETTINGS: ExecutorSettings = {
-  mode: 'default', targetRate: 95, filterRule: 'exclude', maxRetries: 3,
+  mode: 'default', targetRate: 95, qualityCheckRate: 1, filterRule: 'exclude', maxRetries: 3,
   afterRetries: 'wait', urgentReminder: true,
 };
 
@@ -19,6 +20,7 @@ export function executorSettings(value?: Partial<ExecutorSettings>): ExecutorSet
 export function validateExecutorSettings(settings: ExecutorSettings) {
   if (!['default', 'rigorous', 'target'].includes(settings.mode)
     || !Number.isFinite(settings.targetRate) || settings.targetRate < 0 || settings.targetRate > 100
+    || (settings.qualityCheckRate !== undefined && (!Number.isFinite(settings.qualityCheckRate) || settings.qualityCheckRate < 1 || settings.qualityCheckRate > 10))
     || !['exclude', 'include'].includes(settings.filterRule)
     || !Number.isSafeInteger(settings.maxRetries) || settings.maxRetries < 0 || settings.maxRetries > 100
     || !['wait', 'continue'].includes(settings.afterRetries) || typeof settings.urgentReminder !== 'boolean') {
