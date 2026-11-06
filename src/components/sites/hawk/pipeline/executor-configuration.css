@@ -50,3 +50,10 @@
 .hawk-executor-configuration .ant-form-item-extra{font-size:12px;line-height:20px;color:#64748b;margin-top:6px}
 .hawk-executor-configuration .ant-radio-button-wrapper-disabled,.hawk-executor-configuration .ant-select-disabled .ant-select-selection-item{color:#5f6874}
 .hawk-executor-configuration .hawk-observation-slider .ant-slider-mark-text{width:max-content;white-space:nowrap}
+.hawk-executor-configuration .hawk-observation-slider .ant-slider{margin:8px 8px 0}
+.hawk-executor-configuration .hawk-observation-slider-labels{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;margin:0 8px;color:#687385;font-size:12px;line-height:18px}
+.hawk-executor-configuration .hawk-observation-slider-labels span:nth-child(2){text-align:center}
+.hawk-executor-configuration .hawk-observation-slider-labels span:last-child{text-align:right}
+.hawk-executor-configuration .hawk-target-output-mode{display:flex;width:max-content;max-width:100%;margin-bottom:8px}
+.hawk-executor-configuration .hawk-target-output-mode .ant-radio-button-wrapper{height:32px;padding-inline:14px;line-height:30px}
+.hawk-executor-configuration .hawk-target-output-help{margin-top:6px}
