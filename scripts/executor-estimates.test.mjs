@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 require.extensions['.ts'] = (m, file) => m._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, file);
-const { streamCostEvidence, estimateStreamPlan } = require('../src/components/sites/hawk/data/executor-stream-estimates.ts');
+const { streamCostEvidence, estimateStreamPlan, estimateStreamProductsByTime } = require('../src/components/sites/hawk/data/executor-stream-estimates.ts');
 const { summarizeRunTime } = require('../src/components/sites/hawk/data/executor-run-time.ts');
 const { cloneExecutor } = require('../src/components/sites/hawk/data/executor-runtime.ts');
 const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2-examples.ts');
@@ -40,6 +40,14 @@ test('estimate evidence remains fixed between configured refresh checkpoints', (
   const e=executor(), before=streamCostEvidence(e);
   e.stream.inputMetrics[2].costCents=999999; e.stream.inputMetrics[2].finalOutputs=0;
   assert.equal(streamCostEvidence(e).base,before.base);
+});
+test('time forecast uses settled outputs and measured active processing time', () => {
+  const e=executor();e.stream.activeRunMs=2*3600000;
+  assert.deepEqual(estimateStreamProductsByTime(e,4),{products:4000,rate:1000,observedOutputs:2000,observedHours:2});
+  assert.equal(estimateStreamProductsByTime(e,-1).products,undefined);
+  e.stream.activeRunMs=0;assert.match(estimateStreamProductsByTime(e,4).reason,/缺少/);
+  e.stream.activeRunMs=3600000;Object.values(e.stream.inputMetrics).forEach(row=>row.finalOutputs=0);Object.values(e.stream.estimateMetrics).forEach(row=>row.finalOutputs=0);
+  assert.match(estimateStreamProductsByTime(e,4).reason,/缺少/);
 });
 const pair=(span,kind,start,end,extra={})=>[
   {id:span+'-start',span,kind,edge:'start',at:1000+start,monotonicMs:start,clock:'worker-A',...extra},

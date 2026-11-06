@@ -35,3 +35,16 @@ export function estimateStreamPlan(e: LocalExecutor, plan: { budgetYuan: number 
   if ('budgetYuan' in plan) return { evidence, products: { low: Math.floor(plan.budgetYuan * 100 / evidence.high!), base: Math.floor(plan.budgetYuan * 100 / evidence.base!), high: Math.floor(plan.budgetYuan * 100 / evidence.low!) } };
   return { evidence, cost: { low: Math.ceil(plan.products * evidence.low!), base: Math.ceil(plan.products * evidence.base!), high: Math.ceil(plan.products * evidence.high!) } };
 }
+
+/** Time forecasts use only completed outputs and measured active processing time. */
+export function estimateStreamProductsByTime(e: LocalExecutor, hours: number) {
+  const s = e.stream;
+  if (!Number.isFinite(hours) || hours < 0) return { reason: '请填写有效的非负运行时长' };
+  const roots = [...new Set(s?.settledRootIds ?? [])];
+  const metrics = roots.map(root => s?.estimateMetrics?.[root] ?? s?.inputMetrics?.[root]);
+  const outputs = metrics.reduce((sum, row) => sum + (row && Number.isSafeInteger(row.finalOutputs) && row.finalOutputs >= 0 ? row.finalOutputs : 0), 0);
+  const activeRunMs = s?.activeRunMs;
+  if (!Number.isFinite(activeRunMs) || activeRunMs! <= 0 || outputs <= 0) return { reason: '缺少已完成成品或有效处理时长记录' };
+  const rate = outputs / (activeRunMs! / 3600000);
+  return { products: Math.floor(rate * hours), rate, observedOutputs: outputs, observedHours: activeRunMs! / 3600000 };
+}
