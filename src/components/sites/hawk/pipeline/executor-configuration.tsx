@@ -39,7 +39,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
           <Form.Item name="resource" label="资源路径 / 圈选 ID" rules={[{ required: true, whitespace: true, message: '请填写输入资源' }, { pattern: /^(tos|cid|local|https?):\/\/.+/i, message: '请填写 tos://、CID:// 或有效的资源路径' }]}><Input disabled={locked} placeholder="tos://目录/input.csv 或 CID://资源ID" /></Form.Item>
           <div className="hawk-executor-config-grid">
             <Form.Item name="resourceType" label="输入资源类型" rules={[{ required: true }]}><Select disabled={locked} options={[{ value: 'video', label: '视频' }, { value: 'image', label: '图片' }, { value: 'audio', label: '音频' }, { value: 'other', label: '其他' }]} /></Form.Item>
-            <Form.Item name="count" label="演示资源数量" rules={[{ required: true, type: 'integer', min: 1, message: '请填写正整数资源数量' }]}><InputNumber disabled={locked} min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="count" label="演示资源数量（原型演示用，正式不需要）" rules={[{ required: true, type: 'integer', min: 1, message: '请填写正整数资源数量' }]}><InputNumber disabled={locked} min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
           </div>
           {locked && <Typography.Paragraph className="hawk-executor-config-note">执行已开始，输入资源已锁定；后续批次使用前一步产出。</Typography.Paragraph>}
         </div>
@@ -62,7 +62,7 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
             <div className="hawk-stream-config-heading"><DatabaseOutlined aria-hidden="true" /><div><strong>输入与目标成品</strong><p>可分别限制本轮取入量和新增成品量；留空表示不按该项限制。</p></div></div>
             <div className="hawk-executor-config-grid">
               <Form.Item name={['streamPolicy', 'inputLimit']} label="最多取入原始数据（选填，条）" getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="留空处理本轮全部已有输入" style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name={['streamPolicy', 'targetOutputCount']} label="目标成品量（选填，份）" getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="例如 1,000" style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name={['streamPolicy', 'targetOutputCount']} label="目标成品量（选填，份）" extra="预计最终成品数达到该值后停止新增输入；在途任务继续收尾，失败数据仍按已设次数重试。" getValueFromEvent={value => value ?? undefined}><InputNumber disabled={locked} min={1} precision={0} placeholder="例如 1,000" style={{ width: '100%' }} /></Form.Item>
             </div>
           </section>
           <section className="hawk-stream-config-group">
@@ -74,8 +74,8 @@ export function ExecutorConfiguration({ executor, onCancel, onSave }: { executor
             <Form.Item name={['streamPolicy', 'maxRetries']} label="首轮处理后，失败数据自动重试" extra="仅重试失败数据，成功后继续下游；0 表示不自动重试，次数不含首次执行。"><InputNumber disabled={locked} min={0} precision={0} suffix="轮" style={{ width: '100%' }} /></Form.Item>
           </section>
           <section className="hawk-stream-config-group hawk-stream-observation">
-            <div className="hawk-stream-config-heading"><BarChartOutlined aria-hidden="true" /><div><strong>估算刷新批量</strong><p>只影响成本与产量估算更新频率，不影响生产启动或取入量。</p></div></div>
-            <Form.Item name={['streamPolicy', 'observationSize']} label="观察批量" className="hawk-observation-slider"><Slider disabled={locked} min={100} max={1000} step={100} marks={{ 100: { style: { transform: 'none' }, label: '100 条' }, 500: '500 条', 1000: { style: { transform: 'translateX(-100%)' }, label: '1,000 条' } }} /></Form.Item>
+            <div className="hawk-stream-config-heading"><BarChartOutlined aria-hidden="true" /><div><strong>估算刷新批量</strong><p>每累计处理到设定条数后更新一次成本与产量估算，不影响生产启动或取入量。</p></div></div>
+            <Form.Item name={['streamPolicy', 'observationSize']} label="每处理多少条后更新估算" className="hawk-observation-slider"><Slider disabled={locked} min={100} max={1000} step={100} marks={{ 100: { style: { transform: 'none' }, label: '100 条' }, 500: '500 条', 1000: { style: { transform: 'translateX(-100%)' }, label: '1,000 条' } }} /></Form.Item>
           </section>
           <Typography.Paragraph type="secondary">成本预测按已收尾输入及最终成品配对估算，包含失败与重试投入；样本不足时显示原因，不保证后续输入与样本相同。</Typography.Paragraph>
         </div> : <><div className="hawk-settings-row">
