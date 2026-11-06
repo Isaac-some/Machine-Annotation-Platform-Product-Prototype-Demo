@@ -180,7 +180,7 @@ function sync(w: LocalWorkspace, e: LocalExecutor) {
   const s = e.stream!, batches = batchesFor(w, e);
   batches.forEach((b, i) => {
     const stage = s.stages[i]; b.total = i === 0 ? e.inputCount! : s.admitted === e.inputCount && ['review', 'completed'].includes(s.phase) ? stage.processed : -1;
-    b.success = new Set((b.results ?? []).map(r => r.values.source_key)).size; b.failed = stage.failed; b.cost = `¥ ${(stage.costCents / 100).toFixed(2)}`;
+    b.success = Math.max(0, stage.processed - stage.failed); b.failed = stage.failed; b.cost = `¥ ${(stage.costCents / 100).toFixed(2)}`;
     b.progress = b.total > 0 ? Math.min(100, Math.round(stage.processed / b.total * 100)) : 0;
     b.status = e.runtime!.state === 'paused' || s.pausedStages?.includes(i) ? '已暂停' : s.phase === 'draining' ? '收尾中' : s.phase === 'review' ? '已暂停' : s.phase === 'completed' ? '已完成' : '运行中';
     b.inputResource = i ? `CID://stream/${e.id}/${batches[i - 1].id}` : e.input ?? '';
@@ -233,7 +233,8 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       for (let j = 0; j < multiplicity; j++) {
         const key = `${token.key}.${j}`, b = bs[i];
         const result = { id: `${b.id}:${key}`, batchId: b.id, inputOrder: token.root, completedAt: Date.now(), values: { tos_path: `tos://demo/phase2/${e.id}/${key}.json`, result: `合成产物 ${key}`, source_key: token.key } };
-        b.results ??= []; if (!b.results.some(x => x.id === result.id)) b.results.push(result);
+        // Token keys are unique per stage; retries only reprocess tokens that failed before producing a result.
+        b.results ??= []; b.results.push(result);
         stage.outputs += 1;
         if (i === s.queues.length - 1) metric.finalOutputs += 1;
         if (i + 1 < s.queues.length) s.queues[i + 1].push({ key, root: token.root, stage: i + 1, attempt: 0 });
@@ -258,14 +259,14 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
   }
   enforceRunLimits(e);
   const queuedRoots = new Set([...s.queues.flat(), ...(s.stageRecovery?.queues.flat() ?? [])].map(t => t.root));
-  s.settledRootIds = Object.keys(s.inputMetrics).map(Number).filter(root => !queuedRoots.has(root)).sort((a, b) => a - b);
-  const terminal = s.settledRootIds.length;
+  const terminal = Object.keys(s.inputMetrics).length - [...queuedRoots].filter(root => s.inputMetrics[root] !== undefined).length;
   const observationStep = p.observationSize ?? 1000;
   const checkpoints = estimateRefreshCheckpoints(s.settledInputs, terminal, observationStep);
   for (const checkpoint of checkpoints) event(s, `已完成 ${checkpoint} 条模拟生产输入；更新成品转化与成本估算`);
   s.settledInputs = terminal;
-  const settledOutputs = s.settledRootIds.reduce((sum, root) => sum + (s.inputMetrics[root]?.finalOutputs ?? 0), 0);
   if (checkpoints.length) {
+    s.settledRootIds = Object.keys(s.inputMetrics).map(Number).filter(root => !queuedRoots.has(root)).sort((a, b) => a - b);
+    const settledOutputs = s.settledRootIds.reduce((sum, root) => sum + (s.inputMetrics[root]?.finalOutputs ?? 0), 0);
     s.estimateAtInputCount = checkpoints.at(-1);
     s.estimateRootIds = s.settledRootIds.slice(-1000);
     s.estimateMetrics = Object.fromEntries(s.estimateRootIds.flatMap(root => {

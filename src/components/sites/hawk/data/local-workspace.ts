@@ -36,10 +36,11 @@ export interface LocalExecutor {
   };
 }
 export interface LocalWorkspace { lastSimulationTick?: number; exportJobs?: ExportJob[]; trialRuns?: TrialInstance[]; groups: PipelineGroup[]; executors: LocalExecutor[]; projects: ProjectRow[]; batches: BatchRow[]; }
-export const WORKSPACE_KEY = 'annotation-demo.local-workspace.v1';
+export const WORKSPACE_KEY = 'annotation-demo.local-workspace.v2';
 export const WORKSPACE_EVENT = 'hawk-workspace-change';
 export const WORKSPACE_ERROR_EVENT = 'hawk-workspace-storage-error';
-const DATABASE_NAME = 'annotation-demo.workspace.v1';
+const DATABASE_NAME = 'annotation-demo.workspace.v2';
+const LEGACY_DATABASE_NAME = 'annotation-demo.workspace.v1';
 const RESULT_STORE = 'batch-results';
 const initialWorkspace = (): LocalWorkspace => ({ groups: PIPELINE_GROUPS, executors: [], projects: PROJECTS, batches: BATCHES });
 function decodeWorkspace(raw: string): LocalWorkspace {
@@ -52,6 +53,14 @@ let hydration: Promise<void> | undefined;
 let persistQueue = Promise.resolve();
 let database: Promise<IDBDatabase> | undefined;
 const persistedResultCounts = new Map<number, number>();
+let legacyDemoDataCleared = false;
+
+function clearLegacyDemoData() {
+  if (legacyDemoDataCleared || typeof window === 'undefined') return;
+  legacyDemoDataCleared = true;
+  ['annotation-demo.local-workspace.v1', 'annotation-demo.local-resource-entries.v1', 'annotation-demo.local-batch-inputs.v1'].forEach(key => localStorage.removeItem(key));
+  window.indexedDB?.deleteDatabase(LEGACY_DATABASE_NAME);
+}
 
 function getDatabase() {
   database ??= new Promise((resolve, reject) => {
@@ -66,6 +75,7 @@ function getDatabase() {
 function announceChange() { window.dispatchEvent(new Event(WORKSPACE_EVENT)); }
 function announceStorageError() { window.dispatchEvent(new Event(WORKSPACE_ERROR_EVENT)); }
 function readBaseWorkspace() {
+  clearLegacyDemoData();
   try { return decodeWorkspace(localStorage.getItem(WORKSPACE_KEY) ?? 'null'); }
   catch { return initialWorkspace(); }
 }

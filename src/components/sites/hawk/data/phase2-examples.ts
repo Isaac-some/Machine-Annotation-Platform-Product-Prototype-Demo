@@ -2,7 +2,6 @@ import type { LocalWorkspace } from './local-workspace';
 import { executorSettings } from './executor-settings';
 import { DELIVERY_DEMO_FLOW_NAMES, withDeliveryExamples } from './delivery-examples';
 import { cloneExecutor, configureExecutor } from './executor-runtime';
-import { startStream, tickStream } from './executor-streaming';
 import { cloneWorkspace } from './delivery';
 
 const PHASE2_EXECUTOR_NAMES = {
@@ -63,11 +62,6 @@ export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   if (!next.executors.some(e => e.id === 'phase2-live')) {
     next = cloneExecutor(next, 'delivery-demo', { id: 'phase2-live', name: '木牛流马 · 流式生产与成本估算', includeInput: true, includeConfiguration: true });
     next = configureExecutor(next, 'phase2-live', { resource: 'tos://demo/production/10k-videos.csv', count: 10000, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { costLimitCents: 80000, maxRetries: 1, observationSize: 1000 } });
-    next = startStream(next, 'phase2-live');
-    for (let i = 0; i < 130; i++) next = tickStream(next, 'phase2-live');
-    // Pre-seeded progress has no measured browser intervals.
-    const seeded = next.executors.find(e => e.id === 'phase2-live')!.stream!;
-    seeded.activeRunMs = undefined; seeded.stageActiveMs = undefined;
   }
   return refreshPhase2ExampleNames(next);
 }

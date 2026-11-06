@@ -12,9 +12,9 @@ test('legacy result rows migrate out of the workspace snapshot and hydrate after
   const rows = new Map();
   const listeners = new EventTarget();
   global.window = Object.assign(listeners, { indexedDB: null });
-  global.localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
+  global.localStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
   global.IDBKeyRange = { bound: (lower, upper) => ({ lower, upper }) };
-  global.indexedDB = { open: () => {
+  global.indexedDB = { deleteDatabase: name => { assert.equal(name, 'annotation-demo.workspace.v1'); return {}; }, open: () => {
     const request = {};
     setImmediate(() => {
       const stores = {
@@ -44,9 +44,19 @@ test('legacy result rows migrate out of the workspace snapshot and hydrate after
 
   const path = '../src/components/sites/hawk/data/local-workspace.ts';
   const first = require(path);
+  storage.set('annotation-demo.local-workspace.v1', JSON.stringify({ stale: true }));
+  storage.set('annotation-demo.local-resource-entries.v1', JSON.stringify([{ stale: true }]));
+  storage.set('annotation-demo.local-batch-inputs.v1', JSON.stringify({ stale: true }));
   const legacy = { groups: [], executors: [], projects: [], batches: [{ id: 7, results: [{ id: '7:a', batchId: 7, inputOrder: 1, completedAt: 10, values: { result: 'kept' } }] }] };
+  assert.equal(first.WORKSPACE_KEY, 'annotation-demo.local-workspace.v2');
+  assert.equal(first.readWorkspace().batches.some(batch => batch.id === 7), false);
+  assert.equal(storage.has('annotation-demo.local-workspace.v1'), false);
+  assert.equal(storage.has('annotation-demo.local-resource-entries.v1'), false);
+  assert.equal(storage.has('annotation-demo.local-batch-inputs.v1'), false);
   storage.set(first.WORKSPACE_KEY, JSON.stringify(legacy));
-  assert.equal(await first.writeWorkspace(first.readWorkspace()), true);
+  delete require.cache[require.resolve(path)];
+  const migration = require(path);
+  assert.equal(await migration.writeWorkspace(migration.readWorkspace()), true);
   const compact = JSON.parse(storage.get(first.WORKSPACE_KEY));
   assert.equal('results' in compact.batches[0], false);
   assert.equal(rows.get('7:0').result.id, '7:a');

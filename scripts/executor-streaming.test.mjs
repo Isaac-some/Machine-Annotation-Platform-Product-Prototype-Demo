@@ -26,6 +26,14 @@ test('streaming starts immediately and processes the complete fixed input withou
   const keys = w.batches.find(b => b.id === completed.runtime.batchIds[0]).results.map(r => r.id);
   assert.equal(new Set(keys).size, keys.length);
 });
+test('10,000-input demo fixture loads ready without pre-running production ticks', () => {
+  const e = get(fresh(), 'phase2-live');
+  assert.equal(e.inputCount, 10000);
+  assert.equal(e.runtime.state, 'ready');
+  assert.equal(e.runtime.started, false);
+  assert.equal(e.stream, undefined);
+  assert.equal(e.streamPolicy.observationSize, 1000);
+});
 test('optional cost ceiling stops new admission, drains in-flight work and leaves room to adjust the cap', () => {
   let w = fresh(); get(w).streamPolicy.costLimitCents = 432; get(w).streamPolicy.reminderRatio = 60;
   w = S.startStream(w, 'phase2-demo');

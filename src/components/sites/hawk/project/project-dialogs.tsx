@@ -54,7 +54,7 @@ export function BatchCreateDialog({ open, projectId, source, onClose, onCreated 
 }
 
 interface ResourceRecord { id: string; projectId: number; material: string; method: string; source: string; resource: string; ai: boolean; owner: string; createdAt: string; status: string; }
-const RESOURCE_KEY = "annotation-demo.local-resource-entries.v1";
+const RESOURCE_KEY = "annotation-demo.local-resource-entries.v2";
 const RESOURCE_EVENT = "hawk-local-resource-change";
 function subscribeResource(listener: () => void) { window.addEventListener(RESOURCE_EVENT, listener); window.addEventListener("storage", listener); return () => { window.removeEventListener(RESOURCE_EVENT, listener); window.removeEventListener("storage", listener); }; }
 function resourceSnapshot() { return localStorage.getItem(RESOURCE_KEY) ?? "[]"; }
