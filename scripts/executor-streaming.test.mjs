@@ -303,6 +303,12 @@ test('percentage output goal uses the fixed input snapshot and converts upward t
   assert(get(w).stream.admitted < 24);
   assert(get(w).stream.stages.at(-1).outputs >= 3);
 });
+test('estimate refresh begins at 1,000 settled inputs and then follows the configured increment', () => {
+  assert.deepEqual(S.estimateRefreshCheckpoints(0, 999, 100), []);
+  assert.deepEqual(S.estimateRefreshCheckpoints(999, 1000, 100), [1000]);
+  assert.deepEqual(S.estimateRefreshCheckpoints(1000, 1200, 100), [1100, 1200]);
+  assert.deepEqual(S.estimateRefreshCheckpoints(1000, 2000, 1000), [2000]);
+});
 
 const targetReached = (policy = {}) => {
   let w = fresh();

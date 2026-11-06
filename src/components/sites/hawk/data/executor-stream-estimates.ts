@@ -2,9 +2,9 @@ import type { LocalExecutor } from './local-workspace';
 
 /** Empirical cohort ranges, not confidence intervals or a production pricing contract. */
 export function streamCostEvidence(e: LocalExecutor) {
-  const s = e.stream, threshold = e.streamPolicy?.observationSize ?? 100;
-  const roots = [...new Set(s?.settledRootIds ?? [])].slice(-threshold);
-  const rows = roots.map(root => s?.inputMetrics?.[root]);
+  const s = e.stream, threshold = 1000;
+  const roots = [...new Set(s?.estimateRootIds ?? (s?.settledInputs && s.settledInputs >= threshold ? s.settledRootIds : []))].slice(-threshold);
+  const rows = roots.map(root => s?.estimateMetrics ? s.estimateMetrics[root] : s?.inputMetrics?.[root]);
   const missing = rows.some(row => !row || !Number.isFinite(row.costCents) || row.costCents < 0 || !Number.isSafeInteger(row.finalOutputs) || row.finalOutputs < 0);
   const valid = rows.filter((row): row is NonNullable<typeof row> => Boolean(row));
   const cost = valid.reduce((sum, row) => sum + row.costCents, 0);

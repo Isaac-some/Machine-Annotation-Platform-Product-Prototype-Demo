@@ -9,21 +9,21 @@ const { streamCostEvidence, estimateStreamPlan } = require('../src/components/si
 const { summarizeRunTime } = require('../src/components/sites/hawk/data/executor-run-time.ts');
 const { cloneExecutor } = require('../src/components/sites/hawk/data/executor-runtime.ts');
 const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2-examples.ts');
-const executor = () => ({ inputCount: 1000, streamPolicy: { observationSize: 100 }, stream: { admitted: 200, costCents: 90000, settledRootIds: Array.from({length:100},(_,i)=>i+1), inputMetrics: Object.fromEntries(Array.from({length:101},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
+const executor = () => ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
 
 test('paired settled cohorts exclude in-flight cost and use the same base for both directions', () => {
   const e=executor(), budget=estimateStreamPlan(e,{budgetYuan:20}), target=estimateStreamPlan(e,{products:100});
   assert.deepEqual(budget.products,{low:100,base:100,high:100}); assert.deepEqual(target.cost,{low:2000,base:2000,high:2000});
-  e.stream.costCents*=10; e.stream.inputMetrics[101].costCents=999999;
+  e.stream.costCents*=10; e.stream.inputMetrics[1].costCents=999999;
   assert.deepEqual(estimateStreamPlan(e,{budgetYuan:20}).products,budget.products);
-  assert.equal(streamCostEvidence(e).remainingInputs,800);
+  assert.equal(streamCostEvidence(e).remainingInputs,900);
 });
 test('zero-output cohorts are retained and block an optimistic forecast', () => {
-  const e=executor();for(let i=1;i<=10;i++)e.stream.inputMetrics[i].finalOutputs=0;
+  const e=executor();for(let i=2;i<=101;i++)e.stream.estimateMetrics[i].finalOutputs=0;
   const evidence=streamCostEvidence(e);assert.equal(evidence.emptyGroups,1);assert.equal(evidence.ready,false);assert.equal(estimateStreamPlan(e,{budgetYuan:20}).products,undefined);
 });
 test('small, missing, invalid and zero-cost samples do not produce Infinity or a fake range', () => {
-  for(const mutate of [e=>e.stream.settledRootIds.pop(),e=>delete e.stream.inputMetrics[1],e=>e.stream.inputMetrics[1].costCents=-1,e=>Object.values(e.stream.inputMetrics).forEach(r=>r.costCents=0)]) {
+  for(const mutate of [e=>e.stream.estimateRootIds.pop(),e=>delete e.stream.estimateMetrics[2],e=>e.stream.estimateMetrics[2].costCents=-1,e=>Object.values(e.stream.estimateMetrics).forEach(r=>r.costCents=0)]) {
     const e=executor();mutate(e);assert.equal(streamCostEvidence(e).ready,false);assert.equal(estimateStreamPlan(e,{products:1}).cost,undefined);
   }
   assert.equal(estimateStreamPlan(executor(),{budgetYuan:NaN}).products,undefined);
@@ -31,10 +31,15 @@ test('small, missing, invalid and zero-cost samples do not produce Infinity or a
   assert.deepEqual(estimateStreamPlan(executor(),{products:0}).cost,{low:0,base:0,high:0});
 });
 test('retries and one-to-many outputs update forecasts from observed root totals', () => {
-  const e=executor();Object.values(e.stream.inputMetrics).forEach(row=>{row.costCents=80;row.finalOutputs=4;});
+  const e=executor();Object.values(e.stream.estimateMetrics).forEach(row=>{row.costCents=80;row.finalOutputs=4;});
   assert.equal(streamCostEvidence(e).base,20);
-  Object.values(e.stream.inputMetrics).forEach(row=>row.costCents+=40);
+  Object.values(e.stream.estimateMetrics).forEach(row=>row.costCents+=40);
   assert.equal(streamCostEvidence(e).base,30);
+});
+test('estimate evidence remains fixed between configured refresh checkpoints', () => {
+  const e=executor(), before=streamCostEvidence(e);
+  e.stream.inputMetrics[2].costCents=999999; e.stream.inputMetrics[2].finalOutputs=0;
+  assert.equal(streamCostEvidence(e).base,before.base);
 });
 const pair=(span,kind,start,end,extra={})=>[
   {id:span+'-start',span,kind,edge:'start',at:1000+start,monotonicMs:start,clock:'worker-A',...extra},

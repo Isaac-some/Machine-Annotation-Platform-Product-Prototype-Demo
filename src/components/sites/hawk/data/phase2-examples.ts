@@ -45,11 +45,11 @@ function refreshPhase2ExampleNames(workspace: LocalWorkspace): LocalWorkspace {
 export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   let next = withDeliveryExamples(w);
   for (const [id, name, policy] of [
-    ['phase2-1555', '定军山 · 运行上限与计时', { maxRetries: 0, observationSize: 100 }],
-    ['phase2-1441', '长坂坡 · 三环节流式验收', { maxRetries: 0, observationSize: 100 }],
-    ['phase2-demo', '草船借箭 · 流式生产与成本估算', { maxRetries: 1, observationSize: 100 }],
-    ['phase2-cost', '赤壁火攻 · 成本收尾与人工继续', { costLimitCents: 432, maxRetries: 1, reminderRatio: 60, observationSize: 100 }],
-    ['phase2-zero', '空城计 · 零成品与估算边界', { maxRetries: 0, observationSize: 100 }],
+    ['phase2-1555', '定军山 · 运行上限与计时', { maxRetries: 0, observationSize: 1000 }],
+    ['phase2-1441', '长坂坡 · 三环节流式验收', { maxRetries: 0, observationSize: 1000 }],
+    ['phase2-demo', '草船借箭 · 流式生产与成本估算', { maxRetries: 1, observationSize: 1000 }],
+    ['phase2-cost', '赤壁火攻 · 成本收尾与人工继续', { costLimitCents: 432, maxRetries: 1, reminderRatio: 60, observationSize: 1000 }],
+    ['phase2-zero', '空城计 · 零成品与估算边界', { maxRetries: 0, observationSize: 1000 }],
   ] as const) {
     if (next.executors.some(e => e.id === id)) continue;
     next = cloneExecutor(next, 'delivery-demo', { id, name, includeInput: true, includeConfiguration: true });
@@ -58,11 +58,11 @@ export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   }
   if (!next.executors.some(e => e.id === 'phase2-acceptance')) {
     next = cloneExecutor(next, 'delivery-demo', { id: 'phase2-acceptance', name: '桃园结义 · 三环节流式验收', includeInput: true, includeConfiguration: true });
-    next = configureExecutor(next, 'phase2-acceptance', { resource: 'tos://demo/acceptance/240-videos.csv', count: 240, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0, observationSize: 100 } });
+    next = configureExecutor(next, 'phase2-acceptance', { resource: 'tos://demo/acceptance/240-videos.csv', count: 240, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0, observationSize: 1000 } });
   }
   if (!next.executors.some(e => e.id === 'phase2-live')) {
     next = cloneExecutor(next, 'delivery-demo', { id: 'phase2-live', name: '木牛流马 · 流式生产与成本估算', includeInput: true, includeConfiguration: true });
-    next = configureExecutor(next, 'phase2-live', { resource: 'tos://demo/production/10k-videos.csv', count: 10000, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { costLimitCents: 80000, maxRetries: 1, observationSize: 100 } });
+    next = configureExecutor(next, 'phase2-live', { resource: 'tos://demo/production/10k-videos.csv', count: 10000, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { costLimitCents: 80000, maxRetries: 1, observationSize: 1000 } });
     next = startStream(next, 'phase2-live');
     for (let i = 0; i < 130; i++) next = tickStream(next, 'phase2-live');
     // Pre-seeded progress has no measured browser intervals.

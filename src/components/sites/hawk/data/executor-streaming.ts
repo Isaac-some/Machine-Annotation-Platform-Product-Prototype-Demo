@@ -36,6 +36,7 @@ export type StreamRun = {
   };
   phase: 'production' | 'draining' | 'review' | 'completed';
   control: 'automatic' | 'manual'; admitted: number; settledInputs: number; queues: StreamToken[][]; failures: StreamToken[];
+  estimateRootIds?: number[]; estimateMetrics?: Record<number, { costCents: number; finalOutputs: number }>; estimateAtInputCount?: number;
   stages: StreamStage[]; costCents: number; costLimitCents?: number; triggerCostCents?: number; triggerCostAction?: 'drain' | 'continue'; drainFinalCents?: number; predicted?: number;
   inputMetrics: Record<number, { costCents: number; finalOutputs: number }>; settledRootIds: number[];
   reminded: boolean; retryRound: number; reason?: string; preparation?: number; recoveryRuns: number;
@@ -44,6 +45,10 @@ export type StreamRun = {
 };
 export function effectiveTargetOutputCount(policy: StreamPolicy, inputCount: number) {
   return policy.targetOutputPercent === undefined ? policy.targetOutputCount : Math.ceil(inputCount * policy.targetOutputPercent / 100);
+}
+export function estimateRefreshCheckpoints(previous: number, current: number, step: number) {
+  const index = (count: number) => count < 1000 ? 0 : Math.floor((count - 1000) / step) + 1;
+  return Array.from({ length: Math.max(0, index(current) - index(previous)) }, (_, i) => 1000 + (index(previous) + i) * step);
 }
 const batchesFor = (w: LocalWorkspace, e: LocalExecutor) => (e.runtime?.batchIds ?? []).map(id => w.batches.find(b => b.id === id)!);
 const notificationLevel = (e: LocalExecutor, kind: 'reminder' | 'stop') => Math.max(e.notification?.baseline ?? 1, e.notification?.[kind] ?? (kind === 'reminder' ? 1 : 2));
@@ -61,7 +66,7 @@ export function validateStreamPolicy(policy: StreamPolicy, count: number) {
   if (policy.targetOutputPercent !== undefined && policy.targetOutputCount !== undefined) throw new Error('目标成品量只能设置数量或比例其中一种');
   if (!Number.isSafeInteger(policy.maxRetries) || policy.maxRetries < 0) throw new Error('请填写有限的非负整数重试次数，0 表示不自动重试');
   if (policy.reminderRatio !== undefined && (!Number.isFinite(policy.reminderRatio) || policy.reminderRatio <= 0 || policy.reminderRatio >= 100)) throw new Error('提前提醒比例须大于 0 且小于 100%，也可留空');
-  if (policy.observationSize !== undefined && (!Number.isSafeInteger(policy.observationSize) || policy.observationSize < 100 || policy.observationSize > 1000)) throw new Error('观察批量须为 100 至 1000 条之间的整数');
+  if (policy.observationSize !== undefined && (!Number.isSafeInteger(policy.observationSize) || policy.observationSize < 100 || policy.observationSize > 1000 || policy.observationSize % 100 !== 0)) throw new Error('估算刷新步长须为 100 至 1,000 条之间的百数整数');
 }
 export function newStreamRun(stages: number, costLimitCents?: number): StreamRun {
   return { activeRunMs: 0, stageActiveMs: Array(stages).fill(0), phase: 'production', control: 'automatic', admitted: 0, settledInputs: 0, queues: Array.from({ length: stages }, () => []), failures: [], stages: Array.from({ length: stages }, () => ({ processed: 0, failed: 0, outputs: 0, costCents: 0 })), costCents: 0, inputMetrics: {}, settledRootIds: [], costLimitCents, reminded: false, retryRound: 0, recoveryRuns: 0, events: [] };
@@ -255,14 +260,19 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
   const queuedRoots = new Set([...s.queues.flat(), ...(s.stageRecovery?.queues.flat() ?? [])].map(t => t.root));
   s.settledRootIds = Object.keys(s.inputMetrics).map(Number).filter(root => !queuedRoots.has(root)).sort((a, b) => a - b);
   const terminal = s.settledRootIds.length;
-  const observationSize = p.observationSize ?? 100;
-  if (terminal >= observationSize && Math.floor(terminal / observationSize) > Math.floor(s.settledInputs / observationSize)) {
-    const before = Math.floor(s.settledInputs / observationSize), after = Math.floor(terminal / observationSize);
-    for (let i = before; i < after; i++) event(s, `已完成 ${Math.min(terminal, (i + 1) * observationSize)} 条模拟生产输入；更新成品转化与成本估算`);
-  }
+  const observationStep = p.observationSize ?? 1000;
+  const checkpoints = estimateRefreshCheckpoints(s.settledInputs, terminal, observationStep);
+  for (const checkpoint of checkpoints) event(s, `已完成 ${checkpoint} 条模拟生产输入；更新成品转化与成本估算`);
   s.settledInputs = terminal;
   const settledOutputs = s.settledRootIds.reduce((sum, root) => sum + (s.inputMetrics[root]?.finalOutputs ?? 0), 0);
-  if (terminal > 0 && settledOutputs > 0) s.predicted = Math.round(settledOutputs / terminal * e.inputCount!);
+  if (checkpoints.length) {
+    s.estimateAtInputCount = checkpoints.at(-1);
+    s.estimateRootIds = s.settledRootIds.slice(-1000);
+    s.estimateMetrics = Object.fromEntries(s.estimateRootIds.flatMap(root => {
+      const metric = s.inputMetrics[root]; return metric ? [[root, { costCents: metric.costCents, finalOutputs: metric.finalOutputs }] as const] : [];
+    }));
+    if (terminal > 0 && settledOutputs > 0) s.predicted = Math.round(settledOutputs / terminal * e.inputCount!);
+  }
   if (!queued(s)) {
     if (s.stageRecovery) {
       const saved = s.stageRecovery;
