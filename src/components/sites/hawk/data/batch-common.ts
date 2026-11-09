@@ -2,6 +2,7 @@ import type { BatchRow } from './mock-batches';
 export type BatchRetry = { fromNode: number; remaining: number; preparation: number; recovered: number; phase: 'preparing' | 'retrying' | 'done' };
 export type AlarmState = { highestSent: number; windowUntil?: number; pending: number; sent: { level: number; at: number }[] };
 export const newAlarm = (): AlarmState => ({ highestSent: 0, pending: 0, sent: [] });
+export const hasBlockingBatchIssues = (batch?: Pick<BatchRow, 'batchIssues'>) => Boolean(batch?.batchIssues?.some(issue => issue.blocking !== false));
 /** Receive already-defined statistics; denominator/exclusions remain a production contract to confirm. */
 export function evaluateAlarm(previous: AlarmState, failurePercent: number, eligible: boolean, now: number): AlarmState {
   const s: AlarmState = JSON.parse(JSON.stringify(previous));

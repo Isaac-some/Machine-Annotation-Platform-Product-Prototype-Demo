@@ -22,8 +22,8 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
   const evidence = streamCostEvidence(e);
   const plan = estimateStreamPlan(e, mode === 'target' ? { products: target ?? NaN } : { budgetYuan: spend ?? NaN });
   const timePlan = estimateStreamProductsByTime(e, hours ?? NaN);
-  const timeProducts = constraint === 'both' && plan.products && timePlan.products !== undefined
-    ? Math.min(plan.products.base, timePlan.products)
+  const timeProducts = constraint === 'both'
+    ? plan.products && timePlan.products !== undefined ? Math.min(plan.products.base, timePlan.products) : undefined
     : timePlan.products;
   const minimumLimit = (s.costCents + 1) / 100;
   const upperLimit = Math.max(5000, Math.ceil(minimumLimit / 50) * 50, limit ?? 0);
@@ -58,7 +58,7 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
     <div className="hawk-calculator-result" aria-live="polite">
       <span>{mode === 'target' ? '预计新增投入' : '预计新增可交付成品'}</span>
       <strong>{invalid ? '请填写有效数值' : mode === 'capacity' && constraint === 'budget' && plan.products ? `${plan.products.low.toLocaleString()} – ${plan.products.high.toLocaleString()} 份` : mode === 'capacity' && constraint !== 'budget' && timeProducts !== undefined ? `${timeProducts.toLocaleString()} 份` : mode === 'target' && plan.cost ? `${money(plan.cost.low)} – ${money(plan.cost.high)}` : '数据不足，暂无法估算'}</strong>
-      <small>{mode === 'capacity' && constraint !== 'budget' ? `${timePlan.products === undefined ? timePlan.reason : `按已观测吞吐 ${timePlan.rate!.toFixed(1)} 份/小时估算（观测 ${timePlan.observedOutputs} 份 / ${timePlan.observedHours!.toFixed(2)} 小时）`}${constraint === 'both' ? '；预算与时长同时约束时取较低产量上限。' : '。'} 仅作本地演示估算，不代表真实生产承诺。` : plan.reason ?? `基准 ${plan.products ? plan.products.base.toLocaleString() + ' 份' : money(plan.cost!.base)} · 同一批已收尾输入的费用与最终成品配对计算，包含失败、重试和多产物。`}</small>
+      <small>{mode === 'capacity' && constraint !== 'budget' ? `${constraint === 'both' && !plan.products ? plan.reason : timePlan.products === undefined ? timePlan.reason : `按已观测吞吐 ${timePlan.rate!.toFixed(1)} 份/小时估算（新配置样本 ${timePlan.observedOutputs} 份 / ${timePlan.observedHours!.toFixed(2)} 小时；剩余输入 ${timePlan.remainingInputs} 条）`}${constraint === 'both' ? '；预算与时长同时约束时取较低产量上限。' : '。'} 仅作本地演示估算，不代表真实生产承诺。` : plan.reason ?? `基准 ${plan.products ? plan.products.base.toLocaleString() + ' 份' : money(plan.cost!.base)} · 同一批已收尾输入的费用与最终成品配对计算，包含失败、重试和多产物。`}</small>
     </div>
     {mode === 'target' && <div className="hawk-executor-setting-group">
       <ExecutorSettingRow title="预计任务处理工作量" description="按目标成品量、各阶段通过率与实测处理时长估算。">数据不足</ExecutorSettingRow>

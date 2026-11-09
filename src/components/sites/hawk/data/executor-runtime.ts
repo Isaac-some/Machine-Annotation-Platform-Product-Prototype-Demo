@@ -4,6 +4,7 @@ import type { LocalExecutor, LocalWorkspace } from './local-workspace';
 import type { BatchNode, BatchRow } from './mock-batches';
 import { publishedFlowId } from './mock-pipelines';
 import { batchSuccessRate, executorSettings, validateExecutorSettings, type ExecutorSettings } from './executor-settings';
+import { hasBlockingBatchIssues } from './batch-common';
 
 export type PublishedGraph = { nodes: { id: string; data: { operatorId: string; kind?: string; label: string; readOnly?: boolean } }[]; edges?: { source: string; target: string }[] };
 export type ExecutorAction = 'start' | 'pause' | 'resume' | 'end' | 'confirm' | 'retry' | 'finish-batch';
@@ -92,18 +93,19 @@ export function configureExecutor(workspace: LocalWorkspace, id: string, input: 
 export function canExecutorAction(workspace: LocalWorkspace, executor: LocalExecutor, action: ExecutorAction): boolean {
   const runtime = executor.runtime;
   if (!runtime) return false;
+  const batches = executorBatches(workspace, executor);
   if (executor.runMode === 'stream') {
-    if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input && executor.streamPolicy);
+    if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input && executor.streamPolicy) && !batches.some(hasBlockingBatchIssues);
     if (action === 'pause') return runtime.state === 'running' && executor.stream?.phase !== 'draining';
     if (action === 'resume') return runtime.state === 'paused';
     return false;
   }
-  const batch = executorBatches(workspace, executor)[runtime.currentIndex];
+  const batch = batches[runtime.currentIndex];
   if (action === 'finish-batch') return ['running', 'paused', 'waiting'].includes(runtime.state) && Boolean(batch && !batch.finish);
-  if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input?.trim()) && (executor.inputCount ?? 0) > 0 && executorBatches(workspace, executor).length > 0;
+  if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input?.trim()) && (executor.inputCount ?? 0) > 0 && batches.length > 0 && !hasBlockingBatchIssues(batches[0]);
   if (action === 'pause') return runtime.state === 'running';
   if (action === 'resume') return runtime.state === 'paused';
-  if (action === 'confirm') return runtime.state === 'waiting' && !batch?.finish;
+  if (action === 'confirm') return runtime.state === 'waiting' && !batch?.finish && !hasBlockingBatchIssues(batches[runtime.currentIndex + 1]);
   if (action === 'retry') return !batch?.finish && runtime.state === 'waiting' && (executorBatches(workspace, executor)[runtime.currentIndex]?.failed ?? 0) > 0;
   return ['running', 'paused', 'waiting'].includes(runtime.state);
 }

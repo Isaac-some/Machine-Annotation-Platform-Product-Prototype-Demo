@@ -13,6 +13,7 @@ import { publishedFlows, readWorkspace, saveExecutor, useWorkspace, writeWorkspa
 import { BatchCreateDialog, CostDialog, ProjectEditDialog, ResourceDialogs } from "./project-dialogs";
 import { ProjectOtherBatches } from './project-other-batches';
 import { ProjectExecutors } from './project-executors';
+import { hasBlockingBatchIssues } from '../data/batch-common';
 
 export function ProjectDetailPage() {
   const params = { id: useSearchParams().get("id") ?? "234" }; const router = useRouter(); const workspace = useWorkspace(); const projectId = Number(params.id);
@@ -36,7 +37,7 @@ export function ProjectDetailPage() {
     } catch { msg.error('项目关联保存失败，请检查浏览器存储空间'); }
   }, [projectId, msg]);
   const rows = useMemo(() => workspace.batches.filter(row => !row.executorId && row.projectId === projectId && (!keyword.trim() || String(row.id).includes(keyword.trim()) || row.name.includes(keyword.trim())) && (!workflow || row.workflow === workflow) && matchesCreatedAt(row.createdAt, createdAt)), [workspace.batches, projectId, keyword, workflow, createdAt]);
-  const allowed = (row: BatchRow, op: string) => !row.executorId && (op === "开始" ? row.status === "初始化" : op === "暂停" ? row.status === "运行中" : op === "启动" ? row.status === "已暂停" : op === "结束" ? ["运行中", "已暂停"].includes(row.status) : row.status === "部分失败");
+  const allowed = (row: BatchRow, op: string) => !row.executorId && (op === "开始" ? row.status === "初始化" && !hasBlockingBatchIssues(row) : op === "暂停" ? row.status === "运行中" : op === "启动" ? row.status === "已暂停" && !hasBlockingBatchIssues(row) : op === "结束" ? ["运行中", "已暂停"].includes(row.status) : row.status === "部分失败");
   const numeric = (value: number) => value.toLocaleString();
   const columns: ColumnsType<BatchRow> = [
     { title: "批次ID", dataIndex: "id", width: 80 },
@@ -80,6 +81,7 @@ function BatchOperationDialog({ operation, onClose, onSaved }: { operation: { id
   return <Modal title={operation && operation.ids.length > 1 ? "批量操作" : "确认操作"} open={!!operation} onCancel={() => { setOp(null); onClose(); }} okText="保存本地状态" cancelText="取消" onOk={() => {
     if (!operation) return;
     if (workspace.batches.some(row => operation.ids.includes(row.id) && row.executorId)) { msg.error("执行器批次请前往工作台统一操作"); return; }
+    if (["开始", "启动"].includes(selectedOp) && workspace.batches.some(row => operation.ids.includes(row.id) && hasBlockingBatchIssues(row))) { msg.error("所选批次存在未解决的批次级问题，无法开始或启动"); return; }
     const statuses: Record<string, BatchRow["status"]> = { "开始": "运行中", "启动": "运行中", "暂停": "已暂停", "结束": "已结束", "重试": "运行中" };
     try { const timestamp = new Date().toLocaleString("sv-SE", { hour12: false }); writeWorkspace({ ...workspace, batches: workspace.batches.map(row => operation.ids.includes(row.id) ? { ...row, status: statuses[selectedOp], updatedAt: timestamp } : row) }); setOp(null); onSaved(); msg.success("本地状态已保存，未执行真实任务"); } catch { msg.error("状态保存失败，请重试"); }
   }}>{holder}<Typography.Paragraph>已选择 {operation?.ids.length ?? 0} 个批次。本操作仅演示状态变化，不连接后端或生成处理结果。</Typography.Paragraph><Select value={selectedOp} onChange={setOp} options={["开始", "暂停", "启动", "结束", "重试"].map(value => ({ value }))} style={{ width: "100%" }} /></Modal>;

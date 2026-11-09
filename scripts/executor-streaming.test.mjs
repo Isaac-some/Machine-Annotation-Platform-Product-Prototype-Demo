@@ -34,6 +34,23 @@ test('10,000-input demo fixture loads ready without pre-running production ticks
   assert.equal(e.stream, undefined);
   assert.equal(e.streamPolicy.observationSize, 1000);
 });
+test('workflow revision change restarts the time forecast sample window at the configured step', () => {
+  let w = started(); const e = get(w); e.inputCount = 5000; e.streamPolicy.observationSize = 100;
+  e.stream.admitted = 500; e.stream.settledInputs = 500; e.stream.activeRunMs = 4 * 3600000;
+  e.stream.inputMetrics = Object.fromEntries(Array.from({ length: 500 }, (_, i) => [i + 1, { costCents: 30, finalOutputs: 2 }]));
+  e.stream.settledRootIds = Array.from({ length: 500 }, (_, i) => i + 1); e.stream.estimateRootIds = e.stream.settledRootIds.slice();
+  e.stream.estimateMetrics = Object.fromEntries(e.stream.settledRootIds.map(root => [root, { costCents: 30, finalOutputs: 2 }]));
+  e.stream.estimateConfigKey = JSON.stringify(e.flows.map(flow => ({ ...flow, version: 0 })));
+  e.runtime.state = 'running'; e.flows[0].version = (e.flows[0].version ?? 1) + 1;
+  w = S.tickStream(w, e.id, 3600000);
+  assert.equal(get(w).stream.timeEstimateRootIds.length, 0);
+  assert.equal(get(w).stream.estimateWindowReady, true);
+  for (let i = 0; i < 800; i++) w = S.tickStream(w, e.id, 1000);
+  const updated = get(w).stream;
+  assert.equal(updated.timeEstimateRootIds.length, 100);
+  assert(updated.timeEstimateRootIds.every(root => root > 500));
+  assert(updated.estimateWindowActiveRunMs > 0);
+});
 test('optional cost ceiling stops new admission, drains in-flight work and leaves room to adjust the cap', () => {
   let w = fresh(); get(w).streamPolicy.costLimitCents = 432; get(w).streamPolicy.reminderRatio = 60;
   w = S.startStream(w, 'phase2-demo');

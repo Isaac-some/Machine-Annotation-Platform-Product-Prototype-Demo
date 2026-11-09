@@ -49,6 +49,7 @@ export interface BatchRow {
   alarmEnabled?: boolean;
   alarmChannels?: Record<string, string>;
   failureDetails?: { nodeSeq: number; errorCode: string; message: string; rowkey: string }[];
+  batchIssues?: { code: string; title: string; message: string; blocking?: boolean }[];
   alarmGate?: { kind: 'percent' | 'count'; value: number };
   deliveryMode?: DeliveryMode;
   results?: ResultRecord[];
@@ -183,6 +184,10 @@ function seedBatches(): BatchRow[] {
                   : "待处理",
             cost: i === 0 ? "¥ 0.21" : "¥ -",
           })),
+    ...(id === 5799 ? {
+      batchIssues: [{ code: "missing-header", title: "输入资源缺少必需表头", message: "示例诊断：工作流要求 rowkey 列；修正输入并重新校验后，此问题会清除。" }],
+      failureDetails: [{ nodeSeq: 1, errorCode: "NODE_CONFIG", message: "字段映射未找到必需的 rowkey。", rowkey: "demo-rowkey-5799" }],
+    } : {}),
   }));
 }
 

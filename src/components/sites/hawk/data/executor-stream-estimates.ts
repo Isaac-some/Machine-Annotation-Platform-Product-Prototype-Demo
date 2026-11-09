@@ -1,8 +1,12 @@
 import type { LocalExecutor } from './local-workspace';
+import { estimateConfigurationKey } from './executor-streaming';
 
 /** Empirical cohort ranges, not confidence intervals or a production pricing contract. */
 export function streamCostEvidence(e: LocalExecutor) {
   const s = e.stream, threshold = 1000;
+  if (s?.estimateConfigKey && s.estimateConfigKey !== estimateConfigurationKey(e)) {
+    return { ready: false, reason: '工作流配置已变化，等待新配置样本', samples: 0, threshold, groups: 0, emptyGroups: 0, costCents: 0, outputs: 0, base: undefined, low: undefined, high: undefined, remainingInputs: Math.max(0, (e.inputCount ?? 0) - (s.admitted ?? 0)) };
+  }
   const roots = [...new Set(s?.estimateRootIds ?? (s?.settledInputs && s.settledInputs >= threshold ? s.settledRootIds : []))].slice(-threshold);
   const rows = roots.map(root => s?.estimateMetrics ? s.estimateMetrics[root] : s?.inputMetrics?.[root]);
   const missing = rows.some(row => !row || !Number.isFinite(row.costCents) || row.costCents < 0 || !Number.isSafeInteger(row.finalOutputs) || row.finalOutputs < 0);
@@ -40,11 +44,13 @@ export function estimateStreamPlan(e: LocalExecutor, plan: { budgetYuan: number 
 export function estimateStreamProductsByTime(e: LocalExecutor, hours: number) {
   const s = e.stream;
   if (!Number.isFinite(hours) || hours < 0) return { reason: '请填写有效的非负运行时长' };
-  const roots = [...new Set(s?.settledRootIds ?? [])];
-  const metrics = roots.map(root => s?.estimateMetrics?.[root] ?? s?.inputMetrics?.[root]);
+  if (s?.estimateConfigKey && s.estimateConfigKey !== estimateConfigurationKey(e)) return { reason: '工作流配置已变化，等待新配置样本' };
+  const roots = [...new Set(s?.timeEstimateRootIds ?? s?.estimateRootIds ?? s?.settledRootIds ?? [])];
+  const metrics = roots.map(root => s?.timeEstimateMetrics?.[root] ?? s?.estimateMetrics?.[root] ?? s?.inputMetrics?.[root]);
   const outputs = metrics.reduce((sum, row) => sum + (row && Number.isSafeInteger(row.finalOutputs) && row.finalOutputs >= 0 ? row.finalOutputs : 0), 0);
-  const activeRunMs = s?.activeRunMs;
+  const activeRunMs = s?.estimateWindowActiveRunMs ?? s?.activeRunMs;
   if (!Number.isFinite(activeRunMs) || activeRunMs! <= 0 || outputs <= 0) return { reason: '缺少已完成成品或有效处理时长记录' };
   const rate = outputs / (activeRunMs! / 3600000);
-  return { products: Math.floor(rate * hours), rate, observedOutputs: outputs, observedHours: activeRunMs! / 3600000 };
+  const remainingInputs = Math.max(0, (e.inputCount ?? 0) - (s?.admitted ?? 0));
+  return { products: Math.min(remainingInputs, Math.floor(rate * hours)), rate, observedOutputs: outputs, observedHours: activeRunMs! / 3600000, remainingInputs };
 }

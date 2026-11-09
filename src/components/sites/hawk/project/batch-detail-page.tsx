@@ -11,7 +11,8 @@ import { BatchDeliveryStatus, DeliveryControls, FinishControl, downloadDelivery 
 import { withDeliveryExamples } from '../data/delivery-examples';
 import { enableSimulation, finishStandaloneBatch } from '../data/workspace-runtime';
 import "./batch-detail.css";
-import { prepareBatchRetry } from '../data/batch-common';
+import { hasBlockingBatchIssues, prepareBatchRetry } from '../data/batch-common';
+import { BatchCommonControls } from './batch-common-controls';
 
 const FIELD_OPTIONS = ["dir", "tos_path", "ext", "rowkey"];
 const DEFAULT_CONFIG: BatchSystemConfig = {
@@ -160,6 +161,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     if (execution) { execution.onAction(action); return; }
     try {
       if (action === '结束') { writeWorkspace(finishStandaloneBatch(readWorkspace(), batch.id)); return; }
+      if ((action === '开始' || action === '启动') && hasBlockingBatchIssues(batch)) { msg.error('请先修复批次总体问题并重新校验'); return; }
       const target = { ...batch, nodes: batch.nodes.map(node => ({ ...node, status: action === '暂停' && node.status !== '已完成' ? '已暂停' as const : node.status })), status, updatedAt: new Date().toISOString() };
       if (action === '开始' || action === '启动' || action === '重试') {
         enableSimulation(target);
@@ -169,9 +171,9 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     } catch (error) { msg.error(error instanceof Error ? error.message : '操作失败，请重试'); }
   };
   const actions = [
-    { title: "开始", icon: <PlayCircleOutlined />, enabled: batch.status === "初始化", status: "运行中" },
+    { title: "开始", icon: <PlayCircleOutlined />, enabled: batch.status === "初始化" && !hasBlockingBatchIssues(batch), status: "运行中" },
     { title: "暂停", icon: <PauseCircleOutlined />, enabled: batch.status === "运行中", status: "已暂停" },
-    { title: "启动", icon: <PlayCircleOutlined />, enabled: batch.status === "已暂停", status: "运行中" },
+    { title: "启动", icon: <PlayCircleOutlined />, enabled: batch.status === "已暂停" && !hasBlockingBatchIssues(batch), status: "运行中" },
     { title: "结束", icon: <StopOutlined />, enabled: !batch.finish && ["运行中", "已暂停", "部分失败", "已完成"].includes(batch.status), status: "已结束" },
     { title: "重试", icon: <RedoOutlined />, enabled: !batch.finish && ["部分失败", "已结束"].includes(batch.status), status: "运行中" },
   ] as const;
@@ -205,6 +207,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
         <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动','重试'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
       </div>
     </div>
+    <BatchCommonControls batch={batch} onUpdate={updateBatch} />
     <div className="hawk-batch-graph" ref={graphRef} onPointerDown={event => {
       if ((event.target as HTMLElement).closest("button, a, .hawk-batch-minimap")) return;
       drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, offsetX: offset.x, offsetY: offset.y }; event.currentTarget.setPointerCapture(event.pointerId);

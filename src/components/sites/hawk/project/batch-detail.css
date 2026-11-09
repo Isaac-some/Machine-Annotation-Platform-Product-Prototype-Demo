@@ -44,4 +44,5 @@
 .hawk-executor-main .has-run-clock .hawk-batch-estimate{padding-left:24px}
 .hawk-notice-menu .ant-select-item-option{padding:8px 12px;min-height:36px}
 .hawk-notice-menu .ant-select-item-option:last-child{border-top:1px solid #eceff3;margin-top:6px;padding-top:12px;border-radius:0 0 6px 6px}
+.hawk-batch-failure-detail{display:grid;gap:24px}.hawk-batch-failure-detail>section{min-width:0}.hawk-batch-failure-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px;color:#1f2937}.hawk-batch-failure-heading strong{font-size:15px}.hawk-batch-failure-heading span{color:#64748b;font-size:12px}.hawk-batch-issue-list{display:grid;gap:8px}.hawk-batch-failure-empty{padding:14px 16px;background:#f8fafc;color:#64748b;font-size:13px}.hawk-batch-failure-detail .ant-typography{margin:10px 0 0}
 @media(max-width:1100px){.hawk-executor-main .has-run-clock .hawk-batch-metrics-cost{grid-template-columns:minmax(0,1fr);gap:16px}.has-run-clock .hawk-batch-runtime-cost{grid-column:1;justify-self:center}}

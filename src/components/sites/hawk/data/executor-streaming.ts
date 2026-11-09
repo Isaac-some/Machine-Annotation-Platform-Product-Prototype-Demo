@@ -37,6 +37,10 @@ export type StreamRun = {
   phase: 'production' | 'draining' | 'review' | 'completed';
   control: 'automatic' | 'manual'; admitted: number; settledInputs: number; queues: StreamToken[][]; failures: StreamToken[];
   estimateRootIds?: number[]; estimateMetrics?: Record<number, { costCents: number; finalOutputs: number }>; estimateAtInputCount?: number;
+  estimateConfigKey?: string; estimateWindowStartCount?: number; estimateWindowStartRunMs?: number; estimateWindowActiveRunMs?: number;
+  estimateWindowStartRoot?: number; estimateWindowReady?: boolean;
+  estimateWindowRootIds?: number[]; estimateWindowMetrics?: Record<number, { costCents: number; finalOutputs: number }>;
+  timeEstimateRootIds?: number[]; timeEstimateMetrics?: Record<number, { finalOutputs: number }>;
   stages: StreamStage[]; costCents: number; costLimitCents?: number; triggerCostCents?: number; triggerCostAction?: 'drain' | 'continue'; drainFinalCents?: number; predicted?: number;
   inputMetrics: Record<number, { costCents: number; finalOutputs: number }>; settledRootIds: number[];
   reminded: boolean; retryRound: number; reason?: string; preparation?: number; recoveryRuns: number;
@@ -70,6 +74,9 @@ export function validateStreamPolicy(policy: StreamPolicy, count: number) {
 }
 export function newStreamRun(stages: number, costLimitCents?: number): StreamRun {
   return { activeRunMs: 0, stageActiveMs: Array(stages).fill(0), phase: 'production', control: 'automatic', admitted: 0, settledInputs: 0, queues: Array.from({ length: stages }, () => []), failures: [], stages: Array.from({ length: stages }, () => ({ processed: 0, failed: 0, outputs: 0, costCents: 0 })), costCents: 0, inputMetrics: {}, settledRootIds: [], costLimitCents, reminded: false, retryRound: 0, recoveryRuns: 0, events: [] };
+}
+export function estimateConfigurationKey(e: LocalExecutor) {
+  return JSON.stringify(e.flows ?? []);
 }
 export function startStream(w: LocalWorkspace, id: string): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!;
@@ -193,6 +200,20 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
   if (!original?.stream || original.runtime?.state !== 'running') return w;
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e.stream!, p = e.streamPolicy!, bs = batchesFor(next, e);
   s.inputMetrics ??= {}; s.settledRootIds ??= [];
+  const configKey = estimateConfigurationKey(e);
+  if (s.estimateConfigKey !== configKey) {
+    s.estimateConfigKey = configKey;
+    s.estimateWindowStartCount = s.settledInputs;
+    s.estimateWindowStartRunMs = s.activeRunMs ?? 0;
+    s.estimateWindowStartRoot = s.admitted;
+    s.estimateWindowReady = false;
+    s.estimateWindowRootIds = [];
+    s.estimateWindowMetrics = {};
+    s.timeEstimateRootIds = [];
+    s.timeEstimateMetrics = {};
+    s.estimateAtInputCount = undefined;
+    event(s, '工作流配置已变化；按新配置重新收集估算样本');
+  }
   if (s.stageRecovery?.preparation !== undefined) {
     s.stageRecovery.preparation = Math.min(100, s.stageRecovery.preparation + 25);
     if (s.stageRecovery.preparation === 100) {
@@ -260,14 +281,40 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
   enforceRunLimits(e);
   const queuedRoots = new Set([...s.queues.flat(), ...(s.stageRecovery?.queues.flat() ?? [])].map(t => t.root));
   const terminal = Object.keys(s.inputMetrics).length - [...queuedRoots].filter(root => s.inputMetrics[root] !== undefined).length;
+  if (!s.estimateWindowReady && ![...queuedRoots].some(root => root <= (s.estimateWindowStartRoot ?? 0))) {
+    s.estimateWindowReady = true;
+    s.estimateWindowStartCount = terminal;
+    s.estimateWindowStartRunMs = s.activeRunMs ?? 0;
+  }
   const observationStep = p.observationSize ?? 1000;
-  const checkpoints = estimateRefreshCheckpoints(s.settledInputs, terminal, observationStep);
-  for (const checkpoint of checkpoints) event(s, `已完成 ${checkpoint} 条模拟生产输入；更新成品转化与成本估算`);
+  const windowStartCount = s.estimateWindowStartCount ?? terminal;
+  const costCheckpoints = estimateRefreshCheckpoints(s.settledInputs, terminal, observationStep);
+  const completedWindowCount = terminal - windowStartCount;
+  const timeCheckpoints = s.estimateWindowReady && completedWindowCount >= observationStep ? Math.floor(completedWindowCount / observationStep) : 0;
+  for (const checkpoint of costCheckpoints) event(s, `已完成 ${checkpoint} 条模拟生产输入；更新成品转化与成本估算`);
+  if (timeCheckpoints) event(s, `新配置下已完成 ${timeCheckpoints * observationStep} 条模拟生产输入；更新时长产量估算`);
   s.settledInputs = terminal;
-  if (checkpoints.length) {
+  if (timeCheckpoints) {
+    const settledRoots = Object.keys(s.inputMetrics).map(Number).filter(root => !queuedRoots.has(root)).sort((a, b) => a - b);
+    const previouslyObserved = new Set(s.estimateWindowRootIds ?? []);
+    const newRoots = settledRoots.filter(root => root > (s.estimateWindowStartRoot ?? 0) && !previouslyObserved.has(root)).slice(-timeCheckpoints * observationStep);
+    const metricEntries = newRoots.flatMap(root => {
+      const metric = s.inputMetrics[root]; return metric ? [[root, { costCents: metric.costCents, finalOutputs: metric.finalOutputs }] as const] : [];
+    });
+    s.estimateWindowRootIds = newRoots;
+    s.estimateWindowMetrics = Object.fromEntries(metricEntries);
+    s.estimateWindowActiveRunMs = Math.max(0, (s.activeRunMs ?? 0) - (s.estimateWindowStartRunMs ?? 0));
+    s.estimateWindowStartCount = windowStartCount + timeCheckpoints * observationStep;
+    s.estimateWindowStartRunMs = s.activeRunMs ?? 0;
+    s.timeEstimateRootIds = newRoots;
+    s.timeEstimateMetrics = Object.fromEntries(newRoots.flatMap(root => {
+      const metric = s.estimateWindowMetrics?.[root]; return metric ? [[root, { finalOutputs: metric.finalOutputs }] as const] : [];
+    }));
+  }
+  if (costCheckpoints.length) {
     s.settledRootIds = Object.keys(s.inputMetrics).map(Number).filter(root => !queuedRoots.has(root)).sort((a, b) => a - b);
     const settledOutputs = s.settledRootIds.reduce((sum, root) => sum + (s.inputMetrics[root]?.finalOutputs ?? 0), 0);
-    s.estimateAtInputCount = checkpoints.at(-1);
+    s.estimateAtInputCount = costCheckpoints.at(-1);
     s.estimateRootIds = s.settledRootIds.slice(-1000);
     s.estimateMetrics = Object.fromEntries(s.estimateRootIds.flatMap(root => {
       const metric = s.inputMetrics[root]; return metric ? [[root, { costCents: metric.costCents, finalOutputs: metric.finalOutputs }] as const] : [];
