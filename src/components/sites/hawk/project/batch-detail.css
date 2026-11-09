@@ -26,6 +26,11 @@
 .hawk-batch-binding{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e8edf4;border-radius:0 0 8px 8px}
 .hawk-batch-graph-empty{position:absolute;inset:80px 20px;display:grid;place-content:center;color:#94a3b8;font-size:13px;pointer-events:none}
 
+.hawk-batch-progress-links{display:flex;align-items:center;gap:18px;min-width:0;flex:1}
+.hawk-batch-progress-tools .ant-btn{height:24px;padding:0;font-size:14px;color:#1677ff}
+.hawk-batch-progress-tools .ant-btn:hover{color:#4096ff}
+@media(max-width:700px){.hawk-batch-progress-links{width:100%;flex-wrap:wrap;gap:8px 14px}.hawk-batch-progress-links .hawk-batch-progress{flex:1 1 220px}.hawk-batch-progress-tools{flex-shrink:0}}
+
 /* Keep the resource dock visible on standalone project batch details too. */
 .hawk-batch-page:not(.hawk-batch-embedded){height:calc(100dvh - 56px);min-height:0;overflow:hidden}
 .hawk-batch-page:not(.hawk-batch-embedded)>.ant-breadcrumb,.hawk-batch-page:not(.hawk-batch-embedded)>.hawk-batch-header,.hawk-batch-page:not(.hawk-batch-embedded)>.hawk-batch-resources{flex:none}

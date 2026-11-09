@@ -160,6 +160,32 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     const anchor = document.createElement("a"); anchor.href = url; anchor.download = "batch-" + batch.id + "-" + kind + "-metadata.json"; anchor.click(); URL.revokeObjectURL(url);
     msg.success("已导出本地批次元数据 JSON");
   };
+  const exportSnapshot = () => {
+    const snapshot = {
+      localPrototype: true,
+      exportedAt: new Date().toISOString(),
+      batch: {
+        id: batch.id,
+        projectId: batch.projectId,
+        name: batch.name,
+        workflow: batch.workflow,
+        status: batch.status,
+        counts: { total: batch.total, success: batch.success, failed: batch.failed, filtered: batch.filtered },
+        progress: batch.progress,
+        cost: batch.cost,
+        createdAt: batch.createdAt,
+        updatedAt: batch.updatedAt,
+        inputResource: batch.inputResource,
+        deliveryResource: batch.deliveryResource ?? null,
+        nodes: batch.nodes,
+        batchIssues: batch.batchIssues ?? [],
+        failureDetails: batch.failureDetails ?? [],
+      },
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `batch-${batch.id}-snapshot.json`; anchor.click(); URL.revokeObjectURL(url);
+    msg.success("批次快照已导出");
+  };
   const changeStatus = (status: BatchStatus, action: string) => {
     if (execution) { execution.onAction(action); return; }
     try {
@@ -206,7 +232,13 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
         </div>
       </div>
       <div className="hawk-batch-header-bottom">
-        <div className="hawk-batch-progress">{[[batch.success, "#52c41a"], [batch.filtered, "#faad14"], [batch.failed, "#ff4d4f"]].map(([value, color]) => <span key={color} style={{ background: color as string, width: batch.total > 0 ? Math.max(0, Number(value)) / batch.total * 100 + "%" : "0%" }} />)}</div>
+        <div className="hawk-batch-progress-links">
+          <div className="hawk-batch-progress">{[[batch.success, "#52c41a"], [batch.filtered, "#faad14"], [batch.failed, "#ff4d4f"]].map(([value, color]) => <span key={color} style={{ background: color as string, width: batch.total > 0 ? Math.max(0, Number(value)) / batch.total * 100 + "%" : "0%" }} />)}</div>
+          <Space size={14} className="hawk-batch-progress-tools">
+            <Button type="link" onClick={() => setFailureDetailsOpen(true)} disabled={!batch.failed && !batch.batchIssues?.length}>失败详情</Button>
+            <Button type="link" onClick={exportSnapshot}>快照导出</Button>
+          </Space>
+        </div>
         <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动','重试'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
       </div>
     </div>
@@ -234,7 +266,6 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     <div className="hawk-batch-resources">
       <div className="hawk-batch-resource-input"><span>输入资源</span><Typography.Text ellipsis={{ tooltip: batch.inputResource }}>{batch.inputResource || (execution?.waiting ? '等待前置批次产出' : execution ? '待配置输入' : '-')}</Typography.Text><Tooltip title="复制输入资源"><Button aria-label="复制输入资源" type="text" size="small" icon={<CopyOutlined />} disabled={!batch.inputResource} onClick={() => copy(batch.inputResource)} /></Tooltip><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出输入资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("input")} /></Tooltip><Button aria-label="编辑输入资源" type="text" size="small" icon={<EditOutlined />} disabled={Boolean(execution && !execution.inputEditable)} onClick={() => { if (execution) { execution.onEditInput(); return; } setInputValue(batch.inputResource); setInputOpen(true); }} /></div>
       <div className="hawk-batch-resource-delivery"><span>交付文件</span><Typography.Text ellipsis={{ tooltip: batch.deliveryResource }}>{batch.deliveryResource || "-"}</Typography.Text>{batch.deliveryResource && <><Button aria-label="复制交付资源" type="text" size="small" icon={<CopyOutlined />} onClick={() => copy(batch.deliveryResource!)} /><Tooltip title="下载交付文件；旧资源仅提供原有元数据"><Button aria-label="下载交付文件" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("delivery")} /></Tooltip></>}<DeliveryControls batchId={batch.id} /></div>
-      <Button className="hawk-batch-resource-failed" onClick={() => setFailureDetailsOpen(true)}>失败&amp;被过滤记录</Button>
     </div>
     <BatchDeliveryStatus batchId={batch.id} />
     <Modal title="输出字段" open={fieldsOpen} width={560} okText="保 存" cancelText="取 消" onCancel={() => setFieldsOpen(false)} onOk={() => { if (draftFields.some(value => !value)) { msg.warning("请选择输出字段或删除空行"); return; } if (!updateBatch({ outputFields: draftFields as string[] })) return; setFieldsOpen(false); msg.success("输出字段已保存到本机"); }}>
