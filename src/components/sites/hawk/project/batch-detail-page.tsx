@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/lib/demo-navigation";
-import { Alert, Breadcrumb, Button, Form, Input, InputNumber, message, Modal, Popover, Select, Space, Switch, Table, Tooltip, Typography } from "antd";
+import { Alert, Breadcrumb, Button, Divider, Form, Input, InputNumber, message, Modal, Popover, Select, Space, Switch, Table, Tooltip, Typography } from "antd";
 import { CaretRightOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, ExpandOutlined, MinusOutlined, PauseCircleOutlined, PlayCircleOutlined, PlusOutlined, RedoOutlined, RightOutlined, StopOutlined } from "@ant-design/icons";
 import { NODE_STATUS, STATUS_PILL, type BatchNode, type BatchRow, type BatchStatus, type BatchSystemConfig } from "../data/mock-batches";
 import { readWorkspace, useWorkspace, writeWorkspace } from "../data/local-workspace";
@@ -85,6 +85,9 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [draftFields, setDraftFields] = useState<Array<string | undefined>>([]);
   const [configOpen, setConfigOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [alarmOpen, setAlarmOpen] = useState(false);
+  const [failureDetailsOpen, setFailureDetailsOpen] = useState(false);
   const [configForm] = Form.useForm<BatchSystemConfig>();
   const [costTarget, setCostTarget] = useState<"batch" | number | null>(null);
   const [inputOpen, setInputOpen] = useState(false);
@@ -189,7 +192,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
       <div className="hawk-batch-header-top">
         <div className="hawk-batch-heading">批次详情<span style={{ color: pill.color, background: pill.bg }}>{batch.status}</span></div>
         <Space size={10} wrap>
-          <Select aria-label="通知强度" value={batch.notice} prefix="通知强度:" style={{ width: 190 }} onChange={notice => { if (updateBatch({ notice })) msg.success("通知强度已保存到本机"); }} classNames={{ popup: { root: "hawk-notice-menu" } }} options={["飞书消息", "飞书加急", "短信加急", "电话加急", "梯度告警"].map(value => ({ value, label: value }))} />
+          <Select aria-label="通知强度" value={batch.notice} open={noticeOpen} onOpenChange={setNoticeOpen} prefix="通知强度:" style={{ width: 190 }} onChange={notice => { setNoticeOpen(false); if (updateBatch({ notice })) msg.success("通知强度已保存到本机"); }} popupRender={menu => <>{menu}<Divider style={{ margin: '4px 0' }} /><Button type="text" block onClick={() => { setNoticeOpen(false); setAlarmOpen(true); }}>梯度告警</Button></>} classNames={{ popup: { root: "hawk-notice-menu" } }} options={["飞书消息", "飞书加急", "短信加急", "电话加急"].map(value => ({ value, label: value }))} />
           <Button onClick={() => { setDraftFields([...(batch.outputFields ?? [])]); setFieldsOpen(true); }}>输出字段</Button>
           <Button onClick={() => { configForm.setFieldsValue({ ...DEFAULT_CONFIG, ...batch.systemConfig, redis: { ...DEFAULT_CONFIG.redis, ...batch.systemConfig?.redis } }); setConfigOpen(true); }}>配 置</Button>
         </Space>
@@ -207,7 +210,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
         <Space className="hawk-batch-actions" size={10} wrap>{actions.filter(action => execution?.runMode !== 'stream' || ['暂停','启动','重试'].includes(action.title)).map(action => action.title === "结束" ? <FinishControl key={action.title} batchId={batch.id} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onFinish={() => changeStatus(action.status, action.title)} /> : <Button key={action.title} icon={action.icon} disabled={execution ? !execution.canAction(action.title) : !action.enabled} onClick={() => changeStatus(action.status, action.title)}>{action.title}</Button>)}</Space>
       </div>
     </div>
-    <BatchCommonControls batch={batch} onUpdate={updateBatch} />
+    <BatchCommonControls batch={batch} onUpdate={updateBatch} alarmOpen={alarmOpen} onAlarmOpenChange={setAlarmOpen} detailsOpen={failureDetailsOpen} onDetailsOpenChange={setFailureDetailsOpen} />
     <div className="hawk-batch-graph" ref={graphRef} onPointerDown={event => {
       if ((event.target as HTMLElement).closest("button, a, .hawk-batch-minimap")) return;
       drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, offsetX: offset.x, offsetY: offset.y }; event.currentTarget.setPointerCapture(event.pointerId);
@@ -231,7 +234,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     <div className="hawk-batch-resources">
       <div className="hawk-batch-resource-input"><span>输入资源</span><Typography.Text ellipsis={{ tooltip: batch.inputResource }}>{batch.inputResource || (execution?.waiting ? '等待前置批次产出' : execution ? '待配置输入' : '-')}</Typography.Text><Tooltip title="复制输入资源"><Button aria-label="复制输入资源" type="text" size="small" icon={<CopyOutlined />} disabled={!batch.inputResource} onClick={() => copy(batch.inputResource)} /></Tooltip><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出输入资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("input")} /></Tooltip><Button aria-label="编辑输入资源" type="text" size="small" icon={<EditOutlined />} disabled={Boolean(execution && !execution.inputEditable)} onClick={() => { if (execution) { execution.onEditInput(); return; } setInputValue(batch.inputResource); setInputOpen(true); }} /></div>
       <div className="hawk-batch-resource-delivery"><span>交付文件</span><Typography.Text ellipsis={{ tooltip: batch.deliveryResource }}>{batch.deliveryResource || "-"}</Typography.Text>{batch.deliveryResource && <><Button aria-label="复制交付资源" type="text" size="small" icon={<CopyOutlined />} onClick={() => copy(batch.deliveryResource!)} /><Tooltip title="下载交付文件；旧资源仅提供原有元数据"><Button aria-label="下载交付文件" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("delivery")} /></Tooltip></>}<DeliveryControls batchId={batch.id} /></div>
-      <Tooltip title="导出本地失败及过滤数量元数据，不包含后台记录"><Button className="hawk-batch-resource-failed" onClick={() => download("failed-filtered")}>失败&amp;被过滤记录</Button></Tooltip>
+      <Button className="hawk-batch-resource-failed" onClick={() => setFailureDetailsOpen(true)}>失败&amp;被过滤记录</Button>
     </div>
     <BatchDeliveryStatus batchId={batch.id} />
     <Modal title="输出字段" open={fieldsOpen} width={560} okText="保 存" cancelText="取 消" onCancel={() => setFieldsOpen(false)} onOk={() => { if (draftFields.some(value => !value)) { msg.warning("请选择输出字段或删除空行"); return; } if (!updateBatch({ outputFields: draftFields as string[] })) return; setFieldsOpen(false); msg.success("输出字段已保存到本机"); }}>
