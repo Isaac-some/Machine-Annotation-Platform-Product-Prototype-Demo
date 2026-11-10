@@ -83,7 +83,7 @@ function TaskPanel() {
           </div>
           <div>
             <strong style={{ fontSize: 14, fontWeight: 700, color: "#1f2329", display: "block", lineHeight: "17px" }}>演示任务流</strong>
-            <span style={{ fontSize: 11, color: "#8f959e", letterSpacing: 0.5, lineHeight: "11px", display: "block" }}>REAL-TIME STREAM</span>
+            <span style={{ fontSize: 11, color: "#8f959e", letterSpacing: 0.5, lineHeight: "11px", display: "block" }}>固定示例，不代表后台运行任务</span>
           </div>
         </div>
         <Segmented
@@ -207,7 +207,7 @@ export function HawkShell({ children }: { children: React.ReactNode }) {
           <Popover key="tasks" content={<TaskPanel />} trigger="click" placement="bottomRight">
             <a style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "rgba(0,0,0,0.65)", background: "#f5f5f5", borderRadius: 16, padding: "4px 12px", height: 32, lineHeight: "24px" }}>
               <LineChartOutlined style={{ color: "#ff4d4f" }} />
-              <strong style={{ color: "rgba(0,0,0,0.88)", fontWeight: 600 }}>{TASKS.length} 个任务运行中</strong>
+              <strong style={{ color: "rgba(0,0,0,0.88)", fontWeight: 600 }}>{TASKS.length} 条任务示例</strong>
               <DownOutlined style={{ fontSize: 10 }} />
             </a>
           </Popover>,

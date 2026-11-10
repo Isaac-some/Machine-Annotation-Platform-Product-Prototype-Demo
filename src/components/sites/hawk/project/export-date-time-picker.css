@@ -36,6 +36,6 @@
 .hawk-export-calendar .ant-picker-cell-inner.is-chosen{background:#1677ff;color:#fff}
 .hawk-export-calendar .ant-picker-cell:not(.ant-picker-cell-in-view){visibility:hidden}
 /* A tall calendar cannot anchor above/below its field on small viewports. */
-@media(max-width:767px),(max-height:700px){
+@media(max-width:767px),(max-height:900px){
   .hawk-export-calendar-popover{position:fixed!important;inset:50% auto auto 50%!important;transform:translate(-50%,-50%)!important;margin:0}
 }

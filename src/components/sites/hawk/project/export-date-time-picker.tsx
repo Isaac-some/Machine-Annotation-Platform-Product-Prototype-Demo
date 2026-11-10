@@ -42,7 +42,7 @@ export function ExportDateTimePicker({ value, onChange, label, placeholder, disa
       <div className="hawk-export-calendar-footer-actions"><Button onClick={() => { onChange(null); setOpen(false); }}>清空</Button><Button type="primary" disabled={!draft || !validTime} onClick={() => { onChange(Date.parse(`${draft!.format('YYYY-MM-DD')}T${time.length === 5 ? `${time}:00` : time}+08:00`)); setOpen(false); }}>确认时间</Button></div>
     </div>
   </div>;
-  return <Popover open={open && !disabled} onOpenChange={changeOpen} content={content} trigger="click" placement="bottomLeft" arrow={false} classNames={{ root: 'hawk-export-calendar-popover' }} autoAdjustOverflow>
+  return <Popover open={open && !disabled} onOpenChange={changeOpen} content={content} trigger="click" placement="bottomLeft" arrow={false} classNames={{ root: 'hawk-export-calendar-popover' }} getPopupContainer={trigger => trigger.closest<HTMLElement>('.ant-modal-wrap') ?? document.body} autoAdjustOverflow>
     <Button className={`hawk-export-date-trigger${value === null ? ' is-empty' : ''}`} aria-label={label} aria-expanded={open && !disabled} disabled={disabled} icon={<CalendarOutlined />}>{value === null ? placeholder : beijingTime(value)}</Button>
   </Popover>;
 }
