@@ -37,3 +37,25 @@ test('switching scenarios reuses batches and does not run the previous demo in b
  assert.equal(w.batches.length,count);assert.deepEqual(w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).runtime.batchIds,ids);
  assert.equal(w.executors.filter(e=>e.runtime?.state==='running').length,1);
 });
+test('demo batch identities never collide with other executors and legacy collisions are repaired',()=>{
+ let w=fresh();
+ const original=new Map(w.batches.map(b=>[b.id,JSON.stringify(b)]));
+ for(const scenario of ['cost','retry','input']){
+  w=prepareDemoScenario(w,'phase2-reservoir',scenario);
+  assert.equal(new Set(w.batches.map(b=>b.id)).size,w.batches.length);
+  const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID);
+  e.runtime.batchIds.forEach((id,index)=>{
+   const batch=w.batches.find(b=>b.id===id);
+   assert.equal(batch.executorId,DEMO_EXECUTOR_ID);
+   assert.equal(batch.failed,e.stream.stages[index].failed);
+   assert.equal(batch.success,e.stream.stages[index].processed-e.stream.stages[index].failed);
+   if(index)assert.equal(batch.inputFromBatchId,e.runtime.batchIds[index-1]);
+  });
+  for(const [id,snapshot]of original)assert.equal(JSON.stringify(w.batches.find(b=>b.id===id)),snapshot);
+  if(scenario==='retry')assert(e.stream.failures.some(t=>t.stage===1),'the retry demo must include a second-stage failure');
+ }
+ const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID);
+ e.runtime.batchIds[0]=w.batches.find(b=>b.executorId!==DEMO_EXECUTOR_ID).id;
+ w=prepareDemoScenario(w,DEMO_EXECUTOR_ID,'retry');
+ assert.equal(new Set(w.batches.map(b=>b.id)).size,w.batches.length);
+});

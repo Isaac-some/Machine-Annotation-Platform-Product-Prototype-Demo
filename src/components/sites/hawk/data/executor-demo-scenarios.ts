@@ -29,8 +29,8 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   if (!source) throw new Error('请先选择执行器');
   let demo: LocalWorkspace = { ...workspace, executors: [source], batches: workspace.batches.filter(b => source.runtime?.batchIds.includes(b.id)) };
   demo = cloneExecutor(demo, source.id, { id: DEMO_EXECUTOR_ID, name: `演示 · ${DEMO_SCENARIOS.find(s => s.id === scenario)!.title}`, includeConfiguration: true, includeInput: false });
-  const count = ['insufficient', 'end', 'idle', 'error', 'retry'].includes(scenario) ? 6 : scenario === 'cost' ? 1000 : 240;
-  demo = configureExecutor(demo, DEMO_EXECUTOR_ID, { resource: scenario === 'cid' ? 'CID://demo-fixed-input' : scenario === 'csv-invalid' ? 'tos://demo/executor/missing-rowkey.csv' : count === 6 ? 'tos://demo/executor/sample-six.csv' : scenario === 'cost' ? 'tos://demo/executor/cost-input.csv' : 'tos://demo/executor/rowkey-input.csv', count, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0 } });
+  const count = ['insufficient', 'end', 'idle', 'error'].includes(scenario) ? 6 : scenario === 'retry' ? 12 : scenario === 'cost' ? 1000 : 240;
+  demo = configureExecutor(demo, DEMO_EXECUTOR_ID, { resource: scenario === 'cid' ? 'CID://demo-fixed-input' : scenario === 'csv-invalid' ? 'tos://demo/executor/missing-rowkey.csv' : scenario === 'retry' ? 'tos://demo/executor/retry-input.csv' : count === 6 ? 'tos://demo/executor/sample-six.csv' : scenario === 'cost' ? 'tos://demo/executor/cost-input.csv' : 'tos://demo/executor/rowkey-input.csv', count, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0 } });
   demo = { ...demo, executors: demo.executors.filter(e => e.id === DEMO_EXECUTOR_ID), batches: demo.batches.filter(b => b.executorId === DEMO_EXECUTOR_ID) };
   demo = startStream(demo, DEMO_EXECUTOR_ID);
   let e = demo.executors[0];
@@ -49,10 +49,15 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   if (scenario === 'idle') demo = tickStream(demo, DEMO_EXECUTOR_ID, 0, s.source!.lastActivityAt + 600001);
   // Reuse batch identities so repeated demonstrations cannot grow browser storage.
   const previous = workspace.executors.find(e => e.id === DEMO_EXECUTOR_ID);
+  const foreignIds = new Set(workspace.batches.filter(b => b.executorId !== DEMO_EXECUTOR_ID).map(b => b.id));
+  const canReuse = previous?.runtime?.batchIds.length === demo.batches.length && previous.runtime.batchIds.every(id => !foreignIds.has(id));
+  const serial = Math.max(5899, ...workspace.batches.map(b => b.id));
+  const identities = demo.batches.map((_, index) => canReuse ? previous!.runtime!.batchIds[index] : serial + index + 1);
   demo.batches.forEach((batch, index) => {
-    const stable = previous?.runtime?.batchIds[index];
-    if (stable === undefined) return;
+    const stable = identities[index];
     batch.id = stable;
+    batch.inputFromBatchId = index ? identities[index - 1] : undefined;
+    if (index) batch.inputResource = `CID://stream/${DEMO_EXECUTOR_ID}/${identities[index - 1]}`;
     batch.results = batch.results?.map(row => ({ ...row, batchId: stable, id: `${stable}:${row.id.split(':').slice(1).join(':')}` }));
     demo.executors[0].runtime!.batchIds[index] = stable;
   });

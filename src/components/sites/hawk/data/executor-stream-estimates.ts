@@ -1,7 +1,7 @@
 import { observationThreshold } from './executor-observation';
 import type { LocalExecutor } from './local-workspace';
 import { estimateConfigurationKey } from './executor-streaming';
-import { streamTimeEvidence, forecastSupplyWarning, streamForecastSupply } from './executor-time-estimates';
+import { streamTimeEvidence, streamForecastSupply } from './executor-time-estimates';
 
 /** Empirical cohort ranges, not confidence intervals or a production pricing contract. */
 export function streamCostEvidence(e: LocalExecutor) {

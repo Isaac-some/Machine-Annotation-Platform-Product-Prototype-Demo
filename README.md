@@ -1,5 +1,9 @@
 # 机器标注平台产品原型
 
+评审时打开 [在线演示首页](https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/)；执行器场景请选首页第一项，进入后点击右下角「演示与验收」。GitHub 仓库页面是代码入口，GitHub Pages 才是可操作网页。
+
+正式需求见飞书：[需求总览及 E4](https://fyze31atzb.feishu.cn/docx/BzMZd9CVLoNxtPxx4b2czeronse)、[E1](https://fyze31atzb.feishu.cn/docx/GijVd2PMmoqERgx9nGPc5Cpsnkb)、[E2](https://fyze31atzb.feishu.cn/docx/HNQldQdiJoRswBxFPvRcmOxXn3c)、[E3](https://fyze31atzb.feishu.cn/docx/HD6Zdm3cCoBAvCxVWtdcwsqNnje)、[演示验收清单](https://fyze31atzb.feishu.cn/docx/WxdVdbmIeoNurGxUuvkcPHn0nOg)。
+
 ## 2026-11-03 · 批次与串联执行器导出
 
 结束按钮支持三档配置；运行中可按北京时间范围导出、查看进度与历史并重试。执行器支持统一排序配置、逐批次调整和下游文件依赖校验。详见 [体验入口、规则与运行方式](docs/delivery-export.md)。
