@@ -1,0 +1,242 @@
+{
+  "passed": true,
+  "checks": [
+    {
+      "label": "818 minutes",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 333.9852600097656,
+            "right": 342.6551818847656
+          },
+          {
+            "text": "720",
+            "left": 695.5047607421875,
+            "right": 720.2960205078125
+          },
+          {
+            "text": "1,440",
+            "left": 1045.83935546875,
+            "right": 1081.8155517578125
+          }
+        ]
+      ]
+    },
+    {
+      "label": "43200 minutes",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 334,
+            "right": 342.671875
+          },
+          {
+            "text": "21,600",
+            "left": 686.0703125,
+            "right": 729.9296875
+          },
+          {
+            "text": "43,200",
+            "left": 1035.625,
+            "right": 1082
+          }
+        ]
+      ]
+    },
+    {
+      "label": "720 hours",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 334,
+            "right": 342.671875
+          },
+          {
+            "text": "360",
+            "left": 694.96875,
+            "right": 721.03125
+          },
+          {
+            "text": "720",
+            "left": 1057.203125,
+            "right": 1082
+          }
+        ]
+      ]
+    },
+    {
+      "label": "30 days",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 334,
+            "right": 342.671875
+          },
+          {
+            "text": "15",
+            "left": 700.5703125,
+            "right": 715.4296875
+          },
+          {
+            "text": "30",
+            "left": 1064.703125,
+            "right": 1082
+          }
+        ]
+      ]
+    },
+    {
+      "label": "both constraints at 1440",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 334,
+            "right": 342.671875
+          },
+          {
+            "text": "50,000",
+            "left": 486.953125,
+            "right": 533.046875
+          },
+          {
+            "text": "100,000",
+            "left": 633.390625,
+            "right": 686
+          }
+        ],
+        [
+          {
+            "text": "0",
+            "left": 730,
+            "right": 738.671875
+          },
+          {
+            "text": "15",
+            "left": 898.5703125,
+            "right": 913.4296875
+          },
+          {
+            "text": "30",
+            "left": 1064.703125,
+            "right": 1082
+          }
+        ]
+      ]
+    },
+    {
+      "label": "both constraints at 1024",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 126,
+            "right": 134.671875
+          },
+          {
+            "text": "50,000",
+            "left": 278.953125,
+            "right": 325.046875
+          },
+          {
+            "text": "100,000",
+            "left": 425.390625,
+            "right": 478
+          }
+        ],
+        [
+          {
+            "text": "0",
+            "left": 522,
+            "right": 530.671875
+          },
+          {
+            "text": "15",
+            "left": 690.5703125,
+            "right": 705.4296875
+          },
+          {
+            "text": "30",
+            "left": 856.703125,
+            "right": 874
+          }
+        ]
+      ]
+    },
+    {
+      "label": "both constraints at 800",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 50,
+            "right": 58.671875
+          },
+          {
+            "text": "50,000",
+            "left": 184.953125,
+            "right": 231.046875
+          },
+          {
+            "text": "100,000",
+            "left": 313.390625,
+            "right": 366
+          }
+        ],
+        [
+          {
+            "text": "0",
+            "left": 410,
+            "right": 418.671875
+          },
+          {
+            "text": "15",
+            "left": 560.5703125,
+            "right": 575.4296875
+          },
+          {
+            "text": "30",
+            "left": 708.703125,
+            "right": 726
+          }
+        ]
+      ]
+    },
+    {
+      "label": "100000 product target",
+      "marks": [
+        [
+          {
+            "text": "0",
+            "left": 50,
+            "right": 58.671875
+          },
+          {
+            "text": "50,000",
+            "left": 364.953125,
+            "right": 411.046875
+          },
+          {
+            "text": "100,000",
+            "left": 673.390625,
+            "right": 726
+          }
+        ]
+      ]
+    }
+  ],
+  "errors": [],
+  "assertions": [
+    "time-only evidence matches the result",
+    "short observation is displayed in seconds",
+    "supply assumptions visible",
+    "unit conversion preserves duration",
+    "marks do not overlap at unit and input limits",
+    "both constraints require both evidence sources",
+    "exhausted supply yields zero and no target completion time"
+  ]
+}

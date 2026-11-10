@@ -91,9 +91,12 @@ test('a configured idle timeout must be a positive finite integer duration', () 
 
 test('an open exhausted source is not falsely reported as permanently insufficient supply', () => {
   const w = tick(fresh()), e = get(w); e.stream.failures = [];
-  assert.match(T.forecastSupplyWarning(e, 100), /尚未确认/);
+  assert.equal(T.streamForecastSupply(e).status, 'waiting');
+  assert.match(T.forecastSupplyWarning(e, 100), /补充输入/);
+  assert.doesNotMatch(T.forecastSupplyWarning(e, 100), /供给已结束/);
   e.stream.source.closed = true;
-  assert.match(T.forecastSupplyWarning(e, 100), /无法由当前输入支持/);
+  assert.equal(T.streamForecastSupply(e).status, 'exhausted');
+  assert.match(T.forecastSupplyWarning(e, 100), /输入供给已结束/);
 });
 test('check failure arriving while already idle-paused does not leave an undrainable state', () => {
   let w = tick(fresh()); w = tick(w, 1, get(w).stream.source.lastActivityAt + 600000);

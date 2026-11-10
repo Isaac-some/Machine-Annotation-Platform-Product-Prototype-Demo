@@ -100,3 +100,10 @@ test('unmeasured past output cannot be made valid by adding processing time late
   assert.equal(T.streamTimeEvidence(e).observedOutputs, 1);
   assert.equal(T.streamTimeEvidence(e).rate, 60);
 });
+
+test('a positive delivery target cannot acquire a completion time after supply is proven exhausted', () => {
+  const e=fixture();e.inputCount=e.stream.admitted;
+  assert.equal(T.estimateStreamTimeByProducts(e,500).hours,undefined);
+  assert.match(T.estimateStreamTimeByProducts(e,500).reason,/全部处理|输入.*结束/);
+  assert.equal(T.estimateStreamTimeByProducts(e,0).hours.base,0);
+});

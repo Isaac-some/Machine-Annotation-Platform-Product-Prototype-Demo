@@ -78,3 +78,19 @@ test('cloning carries actual policy but clears the source budget and every runti
   const cloned=cloneExecutor(w,source.id,{id:'cloned-budget',name:'Clone',includeInput:true,includeConfiguration:true}).executors.at(-1);
   assert.equal(cloned.streamPolicy.costLimitCents,undefined);assert.equal(cloned.streamPolicy.unitCostMin,.2);assert.equal(cloned.streamPolicy.unitCostMax,.4);assert.equal(cloned.stream,undefined);assert.equal(cloned.runtime.started,false);assert.equal(JSON.stringify(source),before);
 });
+
+test('an exhausted closed source reports zero additional output rather than unlimited capacity', () => {
+  const e=withPhase2Examples({groups:[],projects:[],executors:[],batches:[]}).executors.find(e=>e.id==='phase2-time-basic');
+  e.inputCount=e.stream.admitted;e.stream.source={initialInputCount:e.inputCount,totalKnown:true,closed:true,waiting:false,lastActivityAt:0};
+  const time=estimateStreamProductsByTime(e,4),budget=estimateStreamPlan(e,{budgetYuan:20});
+  assert.equal(time.products,0);assert.equal(time.theoreticalProducts,240);assert.equal(time.supply.status,'exhausted');
+  assert.deepEqual(budget.products,{low:0,base:0,high:0});assert.match(time.supplyWarning,/全部处理|结束/);
+  assert.equal(estimateStreamPlan(e,{products:100}).cost,undefined);
+});
+test('open sources with no available work expose their supply assumption without capping one-to-many yield', () => {
+  const e=withPhase2Examples({groups:[],projects:[],executors:[],batches:[]}).executors.find(e=>e.id==='phase2-time-basic');
+  e.inputCount=e.stream.admitted;e.stream.source={initialInputCount:e.inputCount,totalKnown:true,closed:false,waiting:true,lastActivityAt:0};
+  const waiting=estimateStreamProductsByTime(e,4);assert.equal(waiting.products,240);assert.equal(waiting.supply.status,'waiting');assert.match(waiting.supplyWarning,/补充输入|等待新增/);
+  e.inputCount++;e.stream.source.waiting=false;
+  const ongoing=estimateStreamProductsByTime(e,4);assert.equal(ongoing.products,240);assert.equal(ongoing.supply.status,'unverified');
+});

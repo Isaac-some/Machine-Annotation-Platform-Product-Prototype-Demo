@@ -49,8 +49,11 @@
 .hawk-cost-calculator .ant-slider-mark-text:last-child { transform:translateX(-100%)!important; }
 @media(max-width:600px) { .hawk-calculator-inputs.has-two-columns { grid-template-columns:minmax(0,1fr); } .hawk-calculator-limit { grid-template-columns:minmax(0,1fr)!important; } }
 .hawk-calculator-evidence { display:flex; align-items:center; flex-wrap:wrap; gap:10px 22px; padding:14px 16px; background:#f7f8fa; border-radius:6px; color:#58616c; }
+.hawk-calculator-evidence-group { display:grid; gap:8px; }
+.hawk-calculator-evidence>small { flex-basis:100%; }
 .hawk-calculator-evidence strong { color:#17191c; }
 .hawk-calculator-control { display:grid; gap:8px; }
+.hawk-calculator-control .ant-input-number { width:140px; max-width:100%; }
 .hawk-calculator-control>label { color:#343a40; font-weight:600; }
 .hawk-calculator-control .ant-slider,.hawk-calculator-limit .ant-slider { margin:12px 10px 22px; }
 .hawk-calculator-result { display:grid; gap:4px; padding:15px 18px; border-left:3px solid #1d5fbf; background:#f6f9fd; }

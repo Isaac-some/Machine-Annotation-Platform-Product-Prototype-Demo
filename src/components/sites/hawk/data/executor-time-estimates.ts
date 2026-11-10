@@ -146,17 +146,26 @@ export function streamTimeEvidence(e: LocalExecutor): TimeEvidence {
   const observedHours = groups.reduce((sum, group) => sum + group.activeMs, 0) / 3600000;
   return { ...evidence, method: 'resource', source: profile.source, rate: weightedRate('rate'), slowRate: weightedRate('slowRate'), fastRate: weightedRate('fastRate'), observedOutputs, observedHours, completeSegments: Math.min(...groups.map(group => group.segments.length)), note: `按目标成品构成加权：${classes.map(item => `${item.label} ${Math.round(item.productShare / share * 100)}%`).join('、')}。资源类型速度来自各自独立的整批观测，并非节点耗时相加。` };
 }
+export function streamForecastSupply(e: LocalExecutor): { status: 'exhausted' | 'waiting' | 'unverified'; remainingInputs: number; message: string } {
+  const s = e.stream, remainingInputs = Math.max(0, (e.inputCount ?? 0) - (s?.admitted ?? 0));
+  const queued = Boolean(s?.queues?.some(queue => queue.length) || s?.stageRecovery);
+  // Final products may multiply. Raw input counts are never a product cap.
+  if (s && (!s.source || s.source.closed) && s.source?.totalKnown !== false && Number.isSafeInteger(e.inputCount) && !remainingInputs && !queued && !s.failures?.length) {
+    return { status: 'exhausted', remainingInputs, message: '当前输入已全部处理，输入供给已结束，没有可新增的成品；请补充资源后重新试算。' };
+  }
+  if (s?.source && !s.source.closed && !remainingInputs && !queued) {
+    return { status: 'waiting', remainingInputs, message: `当前没有待处理的新输入；请补充输入${s.failures?.length ? '或重试失败数据' : ''}。产能试算以供数充足为前提。` };
+  }
+  return { status: 'unverified', remainingInputs, message: '按供数充足、后续资源与当前观测相近估算产能；尚未确认现有输入能否支持该产量。' };
+}
 export function forecastSupplyWarning(e: LocalExecutor, products: number) {
-  const s = e.stream;
-  if (products <= 0 || !s) return undefined;
-  // An open source can receive more data; only a closed (or legacy fixed) source proves exhaustion.
-  if ((!s.source || s.source.closed) && Number.isSafeInteger(e.inputCount) && e.inputCount! <= s.admitted && !s.queues.some(queue => queue.length) && !s.failures.length && !s.stageRecovery) return '当前输入已全部处理，已知没有可继续产出的资源；此目标无法由当前输入支持。';
-  return '剩余输入能否支持目标尚未确认；此时间估算不保证资源足量。';
+  return products > 0 ? streamForecastSupply(e).message : undefined;
 }
 export function estimateStreamTimeByProducts(e: LocalExecutor, products: number): TimeForecast {
   const evidence = streamTimeEvidence(e);
   if (!Number.isSafeInteger(products) || products < 0) return { evidence, reason: '请填写非负整数成品量' };
   if (products === 0) return { evidence, hours: { base: 0, low: 0, high: 0 } };
+  if (streamForecastSupply(e).status === 'exhausted') return { evidence, reason: streamForecastSupply(e).message, supplyWarning: forecastSupplyWarning(e, products) };
   if (!evidence.ready) return { evidence, reason: evidence.reason, supplyWarning: forecastSupplyWarning(e, products) };
   return { evidence, supplyWarning: forecastSupplyWarning(e, products), hours: { base: products / evidence.rate!, low: evidence.fastRate ? products / evidence.fastRate : undefined, high: evidence.slowRate ? products / evidence.slowRate : undefined } };
 }
