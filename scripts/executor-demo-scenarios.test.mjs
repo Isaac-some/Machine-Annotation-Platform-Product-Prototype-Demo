@@ -27,7 +27,10 @@ for(const scenario of DEMO_SCENARIOS)test(`demo reaches expected state within si
  if(scenario.id==='insufficient')assert.equal(s.source.waiting,true);
  if(scenario.id==='end')assert.equal(s.phase,'completed');
  if(scenario.id==='error')assert.equal(s.stopReason,'source-error');
- if(scenario.id==='retry')assert(s.failures.length>0 && e.runtime.state==='paused');
+ if(scenario.id==='retry'){
+  assert(s.failures.length>0 && e.runtime.state==='paused');
+  for(const id of e.runtime.batchIds)assert.equal(w.batches.find(b=>b.id===id).status,'已暂停');
+ }
  if(scenario.id==='estimate')assert(s.estimateRootIds.length>0);
  if(scenario.id==='zero')assert.equal(s.stages.at(-1).outputs,0);
 });

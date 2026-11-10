@@ -1,5 +1,5 @@
 import type { LocalWorkspace } from './local-workspace';
-import { cloneExecutor, configureExecutor } from './executor-runtime';
+import { changeExecutorState, cloneExecutor, configureExecutor } from './executor-runtime';
 import { executorSettings } from './executor-settings';
 import { startStream, tickStream, recordStreamSourceEvent } from './executor-streaming';
 
@@ -43,7 +43,10 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   if (scenario === 'input') p.inputLimit = s.admitted + 3;
   if (scenario === 'target') p.targetOutputCount = s.stages.at(-1)!.outputs + 3;
   if (scenario === 'time') p.runtimeLimitMs = s.activeRunMs! + 2400;
-  if (scenario === 'retry') { e.runtime!.state = 'paused'; s.reason = '演示准备完成，请在批次操作中重试失败数据'; }
+  if (scenario === 'retry') {
+    demo = changeExecutorState(demo, DEMO_EXECUTOR_ID, 'pause');
+    demo.executors[0].stream!.reason = '演示准备完成，请在批次操作中重试失败数据';
+  }
   if (scenario === 'end') demo = recordStreamSourceEvent(demo, DEMO_EXECUTOR_ID, { kind: 'end' });
   if (scenario === 'error') demo = recordStreamSourceEvent(demo, DEMO_EXECUTOR_ID, { kind: 'error', message: '演示：输入源暂不可用' });
   if (scenario === 'idle') demo = tickStream(demo, DEMO_EXECUTOR_ID, 0, s.source!.lastActivityAt + 600001);
