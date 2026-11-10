@@ -1,0 +1,121 @@
+{
+  "site": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/",
+  "codeVersion": "be0c56b9c07a20c9fd105827650ebf01cf6cfa77",
+  "method": "Visible native Google Chrome; macOS Accessibility presses/focus, System Events keyboard and CGEvent mouse; actual desktop screenshots. Playwright checks are separate supplementary automation.",
+  "scenes": [
+    {
+      "scene": "费用触顶与收尾",
+      "checkpointSeconds": 9.22,
+      "evidence": "final-01-cost.png"
+    },
+    {
+      "scene": "原始数据取入上限",
+      "checkpointSeconds": 9.27,
+      "evidence": "final-02-input.png"
+    },
+    {
+      "scene": "达到目标成品量",
+      "checkpointSeconds": 9.28,
+      "evidence": "final-03-target.png"
+    },
+    {
+      "scene": "实际运行时长上限",
+      "checkpointSeconds": 9.31,
+      "evidence": "final-04-time.png"
+    },
+    {
+      "scene": "小批次自动预估",
+      "checkpointSeconds": 9.32,
+      "evidence": "final-05-estimate.png"
+    },
+    {
+      "scene": "CID 输入与持续生产",
+      "checkpointSeconds": 9.38,
+      "evidence": "final-06-cid.png"
+    },
+    {
+      "scene": "CSV 读取与 RowKey 校验",
+      "checkpointSeconds": 9.29,
+      "evidence": "final-07-csv.png"
+    },
+    {
+      "scene": "CSV 缺少 RowKey",
+      "checkpointSeconds": 9.29,
+      "evidence": "final-08-csv-invalid.png"
+    },
+    {
+      "scene": "数据不足与等待新增",
+      "checkpointSeconds": 9.31,
+      "evidence": "final-09-insufficient.png"
+    },
+    {
+      "scene": "供数结束",
+      "checkpointSeconds": 9.39,
+      "evidence": "final-09-insufficient.png"
+    },
+    {
+      "scene": "无活动超时",
+      "checkpointSeconds": 9.3,
+      "evidence": "final-11-idle.png"
+    },
+    {
+      "scene": "输入源检查失败",
+      "checkpointSeconds": 9.33,
+      "evidence": "final-08-csv-invalid.png"
+    },
+    {
+      "scene": "失败数据原位恢复",
+      "checkpointSeconds": 9.35,
+      "evidence": "final-13-retry.png"
+    },
+    {
+      "scene": "零成品估算边界",
+      "checkpointSeconds": 9.32,
+      "evidence": "final-14-zero.png"
+    }
+  ],
+  "downloads": [
+    {
+      "name": "export-1-batch-5889.csv",
+      "rows": 12,
+      "inputOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "name": "export-2-batch-5889.csv",
+      "rows": 6,
+      "inputOrder": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "name": "export-3-batch-5889.csv",
+      "rows": 6,
+      "inputOrder": [
+        9,
+        7,
+        8,
+        12,
+        10,
+        11
+      ]
+    }
+  ]
+}
