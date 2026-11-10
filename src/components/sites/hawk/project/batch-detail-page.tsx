@@ -81,6 +81,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
   breadcrumb?: ReactNode; execution?: BatchExecutionContext;
 }) {
   const batchId = batch.id;
+  const configurationReadOnly = batch.status !== '初始化' || Boolean(execution && !execution.inputEditable);
   const [msg, contextHolder] = message.useMessage();
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [draftFields, setDraftFields] = useState<Array<string | undefined>>([]);
@@ -264,7 +265,7 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
     </div>
     {execution && execution.showInputSource !== false && <div className="hawk-batch-binding"><span>输入来源：{execution.inputSource}</span><span>{execution.waiting ? '等待前置批次产出，当前批次不可提前启动' : '按执行器固定关系接续'}</span></div>}
     <div className="hawk-batch-resources">
-      <div className="hawk-batch-resource-input"><span>输入资源</span><Typography.Text ellipsis={{ tooltip: batch.inputResource }}>{batch.inputResource || (execution?.waiting ? '等待前置批次产出' : execution ? '待配置输入' : '-')}</Typography.Text><Tooltip title="复制输入资源"><Button aria-label="复制输入资源" type="text" size="small" icon={<CopyOutlined />} disabled={!batch.inputResource} onClick={() => copy(batch.inputResource)} /></Tooltip><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出输入资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("input")} /></Tooltip><Button aria-label="编辑输入资源" type="text" size="small" icon={<EditOutlined />} disabled={Boolean(execution && !execution.inputEditable)} onClick={() => { if (execution) { execution.onEditInput(); return; } setInputValue(batch.inputResource); setInputOpen(true); }} /></div>
+      <div className="hawk-batch-resource-input"><span>输入资源</span><Typography.Text ellipsis={{ tooltip: batch.inputResource }}>{batch.inputResource || (execution?.waiting ? '等待前置批次产出' : execution ? '待配置输入' : '-')}</Typography.Text><Tooltip title="复制输入资源"><Button aria-label="复制输入资源" type="text" size="small" icon={<CopyOutlined />} disabled={!batch.inputResource} onClick={() => copy(batch.inputResource)} /></Tooltip><Tooltip title="导出本地资源元数据 JSON"><Button aria-label="导出输入资源元数据" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("input")} /></Tooltip><Button aria-label="编辑输入资源" type="text" size="small" icon={<EditOutlined />} disabled={configurationReadOnly} onClick={() => { if (execution) { execution.onEditInput(); return; } setInputValue(batch.inputResource); setInputOpen(true); }} /></div>
       <div className="hawk-batch-resource-delivery"><span>交付文件</span><Typography.Text ellipsis={{ tooltip: batch.deliveryResource }}>{batch.deliveryResource || "-"}</Typography.Text>{batch.deliveryResource && <><Button aria-label="复制交付资源" type="text" size="small" icon={<CopyOutlined />} onClick={() => copy(batch.deliveryResource!)} /><Tooltip title="下载交付文件；旧资源仅提供原有元数据"><Button aria-label="下载交付文件" type="text" size="small" icon={<DownloadOutlined />} onClick={() => download("delivery")} /></Tooltip></>}<DeliveryControls batchId={batch.id} /></div>
     </div>
     <BatchDeliveryStatus batchId={batch.id} />
@@ -273,9 +274,9 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
       <div className="hawk-batch-fields">{draftFields.map((field, index) => <div key={index}><Select aria-label={"输出字段 " + (index + 1)} showSearch value={field} placeholder="请选择输出字段" options={availableFields.filter(value => value === field || !draftFields.includes(value)).map(value => ({ value, label: value }))} onChange={value => setDraftFields(previous => previous.map((item, i) => i === index ? value : item))} /><Button aria-label={"删除输出字段 " + (index + 1)} danger type="text" icon={<DeleteOutlined />} onClick={() => setDraftFields(previous => previous.filter((_, i) => i !== index))} /></div>)}</div>
       <Button type="dashed" block icon={<PlusOutlined />} disabled={draftFields.length >= availableFields.length} onClick={() => setDraftFields(previous => [...previous, undefined])}>新增输出字段</Button>
     </Modal>
-    <Modal title="系统配置" className="hawk-batch-config" open={configOpen} width={560} okText="保存配置" cancelText="取 消" onCancel={() => setConfigOpen(false)} onOk={() => configForm.validateFields().then(systemConfig => { if (!updateBatch({ systemConfig })) return; setConfigOpen(false); msg.success("系统配置已保存到本机"); })}>
-      <Typography.Text type="secondary">系统配置请谨慎修改</Typography.Text>
-      <Form form={configForm} labelCol={{ flex: "144px" }} wrapperCol={{ flex: 1 }} labelAlign="left" colon={false}>
+    <Modal title={configurationReadOnly ? '系统配置（只读）' : '系统配置'} className="hawk-batch-config" open={configOpen} width={560} okText="保存配置" cancelText="取 消" footer={configurationReadOnly ? <Button onClick={() => setConfigOpen(false)}>关闭</Button> : undefined} onCancel={() => setConfigOpen(false)} onOk={() => { if (configurationReadOnly) return; return configForm.validateFields().then(systemConfig => { if (!updateBatch({ systemConfig })) return; setConfigOpen(false); msg.success("系统配置已保存到本机"); }); }}>
+      <Typography.Text type="secondary">{configurationReadOnly ? '批次已启动，当前生效配置仅供查看；修改输入或链路请创建新的执行实例。' : '系统配置请谨慎修改'}</Typography.Text>
+      <Form disabled={configurationReadOnly} form={configForm} labelCol={{ flex: "144px" }} wrapperCol={{ flex: 1 }} labelAlign="left" colon={false}>
         <Form.Item name="primaryKey" label="主键" rules={[{ required: true }]}><Select options={availableFields.map(value => ({ value, label: value }))} /></Form.Item>
         <Form.Item name="batchQps" label="批次QPS"><InputNumber min={1} style={{ width: "100%" }} /></Form.Item>
         <Form.Item name="reusePod" label="复用POD" valuePropName="checked"><Switch /></Form.Item>
@@ -300,6 +301,6 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
       </div>
       <div className="hawk-batch-cost-note">ⓘ　以上金额根据供应商参考价格及当前用量估算，仅供成本参考，最终金额以实际结算结果为准。</div>
     </Modal>
-    <Modal title="编辑输入资源" open={inputOpen} okText="保 存" cancelText="取 消" onCancel={() => setInputOpen(false)} onOk={() => { if (!updateBatch({ inputResource: inputValue.trim() })) return; setInputOpen(false); msg.success("输入资源已保存到本机"); }}><Input value={inputValue} onChange={event => setInputValue(event.target.value)} placeholder="请输入 CID 或资源地址" /><Typography.Text type="secondary">仅更新本地原型中的资源引用。</Typography.Text></Modal>
+    <Modal title="编辑输入资源" open={inputOpen} okText="保 存" cancelText="取 消" onCancel={() => setInputOpen(false)} onOk={() => { if (configurationReadOnly) return; if (!updateBatch({ inputResource: inputValue.trim() })) return; setInputOpen(false); msg.success("输入资源已保存到本机"); }}><Input value={inputValue} onChange={event => setInputValue(event.target.value)} placeholder="请输入 CID 或资源地址" /><Typography.Text type="secondary">仅更新本地原型中的资源引用。</Typography.Text></Modal>
   </div>;
 }
