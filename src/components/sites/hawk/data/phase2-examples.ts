@@ -3,6 +3,8 @@ import { executorSettings } from './executor-settings';
 import { DELIVERY_DEMO_FLOW_NAMES, withDeliveryExamples } from './delivery-examples';
 import { cloneExecutor, configureExecutor } from './executor-runtime';
 import { cloneWorkspace } from './delivery';
+import { estimateConfigurationKey, newStreamRun } from './executor-streaming';
+import { timeConfigurationKey } from './executor-time-estimates';
 
 const PHASE2_EXECUTOR_NAMES = {
   'phase2-1555': ['运行上限与计时 · 可启动验收执行器', '定军山 · 运行上限与计时'],
@@ -44,6 +46,7 @@ function refreshPhase2ExampleNames(workspace: LocalWorkspace): LocalWorkspace {
 export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   let next = withDeliveryExamples(w);
   for (const [id, name, policy] of [
+    ['phase2-reservoir', '流式生产 · 持续供数与运行闸门', { maxRetries: 0, observationSize: 1000 }],
     ['phase2-1555', '定军山 · 运行上限与计时', { maxRetries: 0, observationSize: 1000 }],
     ['phase2-1441', '长坂坡 · 三环节流式验收', { maxRetries: 0, observationSize: 1000 }],
     ['phase2-demo', '草船借箭 · 流式生产与成本估算', { maxRetries: 1, observationSize: 1000 }],
@@ -52,7 +55,7 @@ export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   ] as const) {
     if (next.executors.some(e => e.id === id)) continue;
     next = cloneExecutor(next, 'delivery-demo', { id, name, includeInput: true, includeConfiguration: true });
-    next = configureExecutor(next, id, { resource: ['phase2-1441', 'phase2-1555'].includes(id) ? 'tos://demo/acceptance/240-videos.csv' : 'tos://demo/production/inputs.csv', count: ['phase2-1441', 'phase2-1555'].includes(id) ? 240 : 24, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: policy });
+    next = configureExecutor(next, id, { resource: ['phase2-1441', 'phase2-1555'].includes(id) ? 'tos://demo/acceptance/240-videos.csv' : 'tos://demo/production/inputs.csv', count: id === 'phase2-reservoir' ? 6 : ['phase2-1441', 'phase2-1555'].includes(id) ? 240 : 24, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: policy });
     if (id === 'phase2-zero') next.executors.find(e => e.id === id)!.streamPolicy!.costLimitCents = undefined;
   }
   if (!next.executors.some(e => e.id === 'phase2-acceptance')) {
@@ -62,6 +65,34 @@ export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
   if (!next.executors.some(e => e.id === 'phase2-live')) {
     next = cloneExecutor(next, 'delivery-demo', { id: 'phase2-live', name: '木牛流马 · 流式生产与成本估算', includeInput: true, includeConfiguration: true });
     next = configureExecutor(next, 'phase2-live', { resource: 'tos://demo/production/10k-videos.csv', count: 10000, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { costLimitCents: 80000, maxRetries: 1, observationSize: 1000 } });
+  }
+  // Explicit synthetic observation scenarios; the existing ready-to-run demos remain untouched.
+  for (const [id, name] of [['phase2-time-basic', '借东风 · 整批时间预估'], ['phase2-time-features', '木牛流马 · 资源特征时间预估']] as const) {
+    if (next.executors.some(executor => executor.id === id)) continue;
+    next = cloneExecutor(next, 'delivery-demo', { id, name, includeInput: true, includeConfiguration: true });
+    next = configureExecutor(next, id, { resource: 'tos://demo/time/10k-inputs.csv', count: 10000, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0, observationSize: 100 } });
+    const executor = next.executors.find(item => item.id === id)!;
+    const s = executor.stream = newStreamRun(executor.runtime!.batchIds.length);
+    executor.runtime!.started = true; executor.runtime!.state = 'paused';
+    s.admitted = 1000; s.settledInputs = 1000; s.activeRunMs = 1000 * 60000;
+    s.inputMetrics = Object.fromEntries(Array.from({ length: 1000 }, (_, i) => [i + 1, { costCents: 40, finalOutputs: 1 }]));
+    s.costCents = 40000; s.settledRootIds = Array.from({ length: 1000 }, (_, i) => i + 1);
+    s.estimateRootIds = [...s.settledRootIds]; s.estimateMetrics = structuredClone(s.inputMetrics); s.estimateConfigKey = estimateConfigurationKey(executor);
+    s.stageActiveMs = s.stages.map(() => s.activeRunMs!);
+    s.stages.forEach((stage, index) => {
+      stage.processed = 1000; stage.outputs = 1000;
+      stage.costCents = Math.floor(s.costCents / s.stages.length) + (index === 0 ? s.costCents % s.stages.length : 0);
+      const batch = next.batches.find(item => item.id === executor.runtime!.batchIds[index]);
+      if (batch) { batch.total = 10000; batch.success = 1000; batch.failed = 0; batch.progress = 10; batch.status = '已暂停'; batch.cost = `¥ ${(stage.costCents / 100).toFixed(2)}`; }
+    });
+    const configKey = timeConfigurationKey(executor);
+    const boundary = { activeMs: s.activeRunMs, outputs: 1000, settledInputs: 1000 };
+    const minutes = [80, 120, 90, 110, 100, 80, 120, 90, 110, 100];
+    s.timeObservation = { configKey, source: 'synthetic-demo', updatedAt: Date.now(), checkpoint: boundary, current: { ...boundary }, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 60000 })) };
+    if (id === 'phase2-time-features') s.resourceTimeEvidence = { configKey, source: 'synthetic-demo', classes: [
+      { label: '短视频（≤1分钟）', productShare: .5, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 30000 })) },
+      { label: '长视频（1至5分钟）', productShare: .5, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 120000 })) },
+    ] };
   }
   return refreshPhase2ExampleNames(next);
 }

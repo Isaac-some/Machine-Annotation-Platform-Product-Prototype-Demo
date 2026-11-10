@@ -1,4 +1,5 @@
-import { startStream, tickStream, validateStreamPolicy, type StreamPolicy } from './executor-streaming';
+import { validateDemoCount } from './executor-observation';
+import { startStream, tickStream, validateStreamPolicy, setStreamLimits, resumeStream, streamRunBlockReason, type StreamPolicy } from './executor-streaming';
 import { advanceBatchFinish, appendCompletedResults, beginBatchFinish, exportMembers } from './delivery';
 import type { LocalExecutor, LocalWorkspace } from './local-workspace';
 import type { BatchNode, BatchRow } from './mock-batches';
@@ -57,6 +58,7 @@ export function executorBatches(workspace: LocalWorkspace, executor: LocalExecut
 }
 
 export function setExecutorInput(workspace: LocalWorkspace, id: string, resource: string, count: number): LocalWorkspace {
+  validateDemoCount(count);
   const executor = workspace.executors.find(item => item.id === id);
   if (!executor?.runtime || executor.runtime.started) throw new Error('执行已开始，本次输入不能更换');
   if (!/^(tos|cid|local|https?):\/\/.+/i.test(resource.trim()) || !Number.isSafeInteger(count) || count < 1) throw new Error('请填写有效的资源路径与正整数资源数量');
@@ -72,7 +74,18 @@ export function setExecutorInput(workspace: LocalWorkspace, id: string, resource
 /** Save resource and release rules atomically; an invalid form never saves half. */
 export function configureExecutor(workspace: LocalWorkspace, id: string, input: { resource: string; count: number; resourceType: NonNullable<LocalExecutor['resourceType']>; settings: ExecutorSettings; runMode?: 'batch' | 'stream'; streamPolicy?: StreamPolicy }): LocalWorkspace {
   const original = workspace.executors.find(item => item.id === id);
-  if (!original?.runtime || original.runtime.state === 'running') throw new Error('请先暂停，再调整输入及执行器配置');
+  if (!original?.runtime) throw new Error('请先暂停，再调整输入及执行器配置');
+  if (original.runtime.started && original.runMode === 'stream') {
+    const unchanged = input.resource === original.input && input.count === original.inputCount && input.resourceType === original.resourceType && (input.runMode ?? original.runMode) === original.runMode && JSON.stringify(input.settings) === JSON.stringify(executorSettings(original.settings));
+    if (!unchanged) throw new Error('执行已开始，只能修改运行限制；输入和其他生产配置已锁定');
+    const before = original.streamPolicy!, after = input.streamPolicy;
+    if (!after) throw new Error('请填写运行限制');
+    for (const key of Object.keys({ ...before, ...after }) as (keyof StreamPolicy)[]) {
+      if (!['costLimitCents', 'inputLimit', 'runtimeLimitMs', 'idleTimeoutMs', 'costLimitAction'].includes(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) throw new Error('执行已开始，只能修改运行限制');
+    }
+    return setStreamLimits(workspace, id, { costLimitCents: after.costLimitCents, inputLimit: after.inputLimit, runtimeLimitMs: after.runtimeLimitMs, idleTimeoutMs: after.idleTimeoutMs });
+  }
+  if (original.runtime.state === 'running') throw new Error('请先暂停，再调整输入及执行器配置');
   validateExecutorSettings(input.settings);
   if (original.runtime.started && (input.runMode ?? original.runMode ?? 'batch') !== (original.runMode ?? 'batch')) throw new Error('首次启动后运行方式已锁定');
   if (input.runMode === 'stream') { if (!input.streamPolicy) throw new Error('请填写流式策略'); validateStreamPolicy(input.streamPolicy, input.count); }
@@ -97,7 +110,7 @@ export function canExecutorAction(workspace: LocalWorkspace, executor: LocalExec
   if (executor.runMode === 'stream') {
     if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input && executor.streamPolicy) && !batches.some(hasBlockingBatchIssues);
     if (action === 'pause') return runtime.state === 'running' && executor.stream?.phase !== 'draining';
-    if (action === 'resume') return runtime.state === 'paused';
+    if (action === 'resume') return ['paused', 'waiting'].includes(runtime.state) && executor.stream?.phase !== 'draining' && executor.stream?.phase !== 'completed' && !streamRunBlockReason(executor);
     return false;
   }
   const batch = batches[runtime.currentIndex];
@@ -114,6 +127,7 @@ export function changeExecutorState(workspace: LocalWorkspace, id: string, actio
   const original = workspace.executors.find(item => item.id === id);
   if (!original || !canExecutorAction(workspace, original, action)) throw new Error(action === 'start' ? '请先配置有效的本次输入' : '当前执行状态不支持此操作');
   if (original.runMode === 'stream' && action === 'start') return startStream(workspace, id);
+  if (original.runMode === 'stream' && action === 'resume') return resumeStream(workspace, id);
   const next = copy(workspace);
   const executor = next.executors.find(item => item.id === id)!;
   const runtime = executor.runtime!;

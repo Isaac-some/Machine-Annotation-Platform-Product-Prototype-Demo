@@ -67,4 +67,17 @@ test('legacy result rows migrate out of the workspace snapshot and hydrate after
   await new Promise(resolve => setImmediate(resolve));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(reloaded.readWorkspace().batches[0].results[0].values.result, 'kept');
+
+  // A failed settings save must roll the optimistic cache back to the prior snapshot.
+  const before = reloaded.readWorkspace(), persistedBefore = storage.get(first.WORKSPACE_KEY);
+  const originalSet = global.localStorage.setItem;
+  global.localStorage.setItem = () => { throw new Error('quota exceeded'); };
+  const failedSave = reloaded.writeWorkspace({ ...before, lastSimulationTick: 123456 });
+  const queuedTick = reloaded.writeWorkspace({ ...reloaded.readWorkspace(), lastSimulationTick: 123457 });
+  assert.equal(await failedSave, false);
+  assert.equal(await queuedTick, false);
+  assert.deepEqual(reloaded.readWorkspace(), before);
+  assert.equal(storage.get(first.WORKSPACE_KEY), persistedBefore);
+  global.localStorage.setItem = originalSet;
+  assert.equal(await reloaded.writeWorkspace(before), true);
 });

@@ -1,26 +1,28 @@
+import { observationThreshold } from './executor-observation';
 import type { LocalExecutor } from './local-workspace';
 import { estimateConfigurationKey } from './executor-streaming';
+import { streamTimeEvidence, forecastSupplyWarning } from './executor-time-estimates';
 
 /** Empirical cohort ranges, not confidence intervals or a production pricing contract. */
 export function streamCostEvidence(e: LocalExecutor) {
-  const s = e.stream, threshold = 1000;
+  const s = e.stream, threshold = observationThreshold(e.stream?.source?.initialInputCount ?? e.inputCount ?? 0);
   if (s?.estimateConfigKey && s.estimateConfigKey !== estimateConfigurationKey(e)) {
     return { ready: false, reason: '工作流配置已变化，等待新配置样本', samples: 0, threshold, groups: 0, emptyGroups: 0, costCents: 0, outputs: 0, base: undefined, low: undefined, high: undefined, remainingInputs: Math.max(0, (e.inputCount ?? 0) - (s.admitted ?? 0)) };
   }
-  const roots = [...new Set(s?.estimateRootIds ?? (s?.settledInputs && s.settledInputs >= threshold ? s.settledRootIds : []))].slice(-threshold);
+  const roots = [...new Set(s?.estimateRootIds ?? (s?.settledInputs && s.settledInputs >= threshold ? s.settledRootIds : []))].slice(-1000);
   const rows = roots.map(root => s?.estimateMetrics ? s.estimateMetrics[root] : s?.inputMetrics?.[root]);
   const missing = rows.some(row => !row || !Number.isFinite(row.costCents) || row.costCents < 0 || !Number.isSafeInteger(row.finalOutputs) || row.finalOutputs < 0);
   const valid = rows.filter((row): row is NonNullable<typeof row> => Boolean(row));
   const cost = valid.reduce((sum, row) => sum + row.costCents, 0);
   const outputs = valid.reduce((sum, row) => sum + row.finalOutputs, 0);
-  const groupSize = Math.max(5, Math.ceil(threshold / 10));
+  const groupSize = Math.max(1, Math.ceil(Math.min(1000, valid.length) / 10));
   const groups = Array.from({ length: Math.ceil(valid.length / groupSize) }, (_, i) => valid.slice(i * groupSize, (i + 1) * groupSize));
   const emptyGroups = groups.filter(group => group.reduce((sum, row) => sum + row.finalOutputs, 0) === 0).length;
   const units = groups.filter(group => group.length === groupSize).map(group => {
     const n = group.reduce((sum, row) => sum + row.finalOutputs, 0);
     return n ? group.reduce((sum, row) => sum + row.costCents, 0) / n : undefined;
   }).filter((n): n is number => n !== undefined).sort((a, b) => a - b);
-  const reason = missing ? '部分输入缺少完整的成本或成品记录' : roots.length < threshold ? `观察到 ${roots.length} / ${threshold} 条已收尾输入` : emptyGroups ? `${emptyGroups} 组尚无成品，暂不外推产量` : units.length < 2 || outputs === 0 || cost <= 0 ? '有效成本与成品样本不足' : undefined;
+  const reason = missing ? '部分输入缺少完整的成本或成品记录' : roots.length < threshold ? `观察到 ${roots.length} / ${threshold} 条已收尾输入` : emptyGroups ? `${emptyGroups} 组尚无成品，暂不外推产量` : units.length < 1 || outputs === 0 || cost <= 0 ? '有效成本与成品样本不足' : undefined;
   const base = outputs > 0 ? cost / outputs : undefined;
   return {
     ready: reason === undefined, reason, samples: roots.length, threshold, groups: groups.length, emptyGroups,
@@ -40,17 +42,12 @@ export function estimateStreamPlan(e: LocalExecutor, plan: { budgetYuan: number 
   return { evidence, cost: { low: Math.ceil(plan.products * evidence.low!), base: Math.ceil(plan.products * evidence.base!), high: Math.ceil(plan.products * evidence.high!) } };
 }
 
-/** Time forecasts use only completed outputs and measured active processing time. */
+/** Inverse of the same measured whole-executor throughput used by target-time forecasts. */
 export function estimateStreamProductsByTime(e: LocalExecutor, hours: number) {
-  const s = e.stream;
   if (!Number.isFinite(hours) || hours < 0) return { reason: '请填写有效的非负运行时长' };
-  if (s?.estimateConfigKey && s.estimateConfigKey !== estimateConfigurationKey(e)) return { reason: '工作流配置已变化，等待新配置样本' };
-  const roots = [...new Set(s?.timeEstimateRootIds ?? s?.estimateRootIds ?? s?.settledRootIds ?? [])];
-  const metrics = roots.map(root => s?.timeEstimateMetrics?.[root] ?? s?.estimateMetrics?.[root] ?? s?.inputMetrics?.[root]);
-  const outputs = metrics.reduce((sum, row) => sum + (row && Number.isSafeInteger(row.finalOutputs) && row.finalOutputs >= 0 ? row.finalOutputs : 0), 0);
-  const activeRunMs = s?.estimateWindowActiveRunMs ?? s?.activeRunMs;
-  if (!Number.isFinite(activeRunMs) || activeRunMs! <= 0 || outputs <= 0) return { reason: '缺少已完成成品或有效处理时长记录' };
-  const rate = outputs / (activeRunMs! / 3600000);
-  const remainingInputs = Math.max(0, (e.inputCount ?? 0) - (s?.admitted ?? 0));
-  return { products: Math.min(remainingInputs, Math.floor(rate * hours)), rate, observedOutputs: outputs, observedHours: activeRunMs! / 3600000, remainingInputs };
+  const evidence = streamTimeEvidence(e);
+  if (!evidence.ready) return { reason: evidence.reason };
+  const rate = evidence.rate!, products = Math.floor(rate * hours);
+  const remainingInputs = Math.max(0, (e.inputCount ?? 0) - (e.stream?.admitted ?? 0));
+  return { products, rate, observedOutputs: evidence.observedOutputs, observedHours: evidence.observedHours, remainingInputs, evidence, supplyWarning: forecastSupplyWarning(e, products) };
 }

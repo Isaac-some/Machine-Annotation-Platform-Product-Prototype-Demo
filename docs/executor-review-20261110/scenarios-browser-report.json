@@ -1,0 +1,99 @@
+{
+  "passed": true,
+  "url": "local static build",
+  "scenarios": [
+    {
+      "id": "input",
+      "loadedMs": 465,
+      "stopReason": "input",
+      "phase": "draining",
+      "storageBytes": 230251
+    },
+    {
+      "id": "target",
+      "loadedMs": 450,
+      "stopReason": "target",
+      "phase": "draining",
+      "storageBytes": 230283
+    },
+    {
+      "id": "time",
+      "loadedMs": 457,
+      "stopReason": "time",
+      "phase": "draining",
+      "storageBytes": 230268
+    },
+    {
+      "id": "estimate",
+      "loadedMs": 438,
+      "phase": "production",
+      "storageBytes": 228040
+    },
+    {
+      "id": "cid",
+      "loadedMs": 441,
+      "phase": "production",
+      "storageBytes": 228078
+    },
+    {
+      "id": "csv",
+      "loadedMs": 450,
+      "phase": "production",
+      "storageBytes": 226130
+    },
+    {
+      "id": "csv-invalid",
+      "loadedMs": 427,
+      "stopReason": "source-error",
+      "phase": "review",
+      "storageBytes": 225779
+    },
+    {
+      "id": "insufficient",
+      "loadedMs": 488,
+      "phase": "production",
+      "storageBytes": 227231
+    },
+    {
+      "id": "end",
+      "loadedMs": 447,
+      "phase": "completed",
+      "storageBytes": 227319
+    },
+    {
+      "id": "idle",
+      "loadedMs": 472,
+      "stopReason": "idle",
+      "phase": "review",
+      "storageBytes": 227376
+    },
+    {
+      "id": "error",
+      "loadedMs": 475,
+      "stopReason": "source-error",
+      "phase": "review",
+      "storageBytes": 227402
+    },
+    {
+      "id": "retry",
+      "loadedMs": 459,
+      "phase": "production",
+      "storageBytes": 227219
+    },
+    {
+      "id": "zero",
+      "loadedMs": 457,
+      "phase": "production",
+      "storageBytes": 232041
+    },
+    {
+      "id": "cost",
+      "loadedMs": 1569,
+      "stopReason": "cost",
+      "phase": "draining",
+      "storageBytes": 288998
+    }
+  ],
+  "errors": [],
+  "longTasks": []
+}

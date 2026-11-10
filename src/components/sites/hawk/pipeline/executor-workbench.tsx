@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/lib/demo-navigation";
 import { Alert, Button, Empty, message, Modal, Space, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, PauseOutlined, PlayCircleOutlined, SettingOutlined } from '@ant-design/icons';
-import { readWorkspace, useWorkspace, writeWorkspace } from '../data/local-workspace';
+import { readWorkspace, useWorkspace, writeWorkspace, WORKSPACE_RESUME_EVENT } from '../data/local-workspace';
 import { canExecutorAction, changeExecutorState, executorBatches, initializeExecutor, configureExecutor, type ExecutorAction, type PublishedGraph } from '../data/executor-runtime';
 import type { PipelineDraft } from '../data/mock-pipelines';
 import { STATUS_PILL, type BatchRow } from '../data/mock-batches';
@@ -15,8 +15,9 @@ import { BatchDetailPanel } from '../project/batch-detail-page';
 import { ExecutorConfiguration } from './executor-configuration';
 import { executorSettings, batchSuccessRate } from '../data/executor-settings';
 import './executor-workbench.css';
-import { retryStreamStage, toggleStreamStage } from '../data/executor-streaming';
+import { retryStreamStage, toggleStreamStage, streamRunBlockReason } from '../data/executor-streaming';
 import { ExecutorStreamPanel, ExecutorCloneButton } from './executor-stream-panel';
+import { ExecutorDemoDrawer } from './executor-demo-drawer';
 import { withPhase2Examples } from '../data/phase2-examples';
 
 const STATES = { ready: '待执行', running: '运行中', paused: '已暂停', waiting: '待人工确认', completed: '已完成', ended: '已结束' } as const;
@@ -76,10 +77,11 @@ export function ExecutorWorkbench() {
   const openInput = () => setSettingsOpen(true);
   const settings = executorSettings(executor.settings);
   const currentRate = current ? batchSuccessRate(current, settings.filterRule) : null;
-  const executeAction = (action: ExecutorAction) => {
+  const executeAction = async (action: ExecutorAction) => {
     try {
-      writeWorkspace(changeExecutorState(readWorkspace(), id, action)); setStorageError('');
-      if (action === 'start' || action === 'resume') setViewedBatchId(null);
+      if (!await writeWorkspace(changeExecutorState(readWorkspace(), id, action))) throw new Error('本地保存失败，操作未生效');
+      setStorageError('');
+      if (action === 'start' || action === 'resume') { window.dispatchEvent(new Event(WORKSPACE_RESUME_EVENT)); setViewedBatchId(null); }
     } catch (error) { msg.error(error instanceof Error ? error.message : '本地状态保存失败，当前进度已保留'); }
   };
   const runAction = (action: ExecutorAction) => {
@@ -88,15 +90,18 @@ export function ExecutorWorkbench() {
     const limits = [
       p?.costLimitCents ? { label: '成本上限', value: `¥${(p.costLimitCents / 100).toFixed(2)}` } : undefined,
       p?.inputLimit ? { label: '最多取入', value: `${p.inputLimit.toLocaleString()} 条` } : undefined,
-      p?.runtimeLimitMs ? { label: '实际运行上限', value: `${(p.runtimeLimitMs / 3600000).toLocaleString()} 小时` } : undefined,
+      p?.runtimeLimitMs ? { label: '实际运行上限', value: `${(p.runtimeLimitMs / 60000).toLocaleString()} 分钟` } : undefined,
       p?.targetOutputPercent !== undefined ? { label: '目标成品', value: `${p.targetOutputPercent.toFixed(1)}% 输入量` } : p?.targetOutputCount ? { label: '目标成品', value: `${p.targetOutputCount.toLocaleString()} 份` } : undefined,
     ].filter(item => item !== undefined);
+    const missing = [['成本上限', p?.costLimitCents], ['取数条数上限', p?.inputLimit], ['运行时长上限', p?.runtimeLimitMs]].filter(([, value]) => value === undefined).map(([label]) => label);
+    if (!missing.length) { void executeAction(action); return; }
     Modal.confirm({ title: '确认本轮输入与运行范围', okText: '确认一键运行', cancelText: '检查配置', width: 560,
       content: <div className="hawk-executor-start-notice">
-        <p className="hawk-executor-start-input">本轮输入 <strong>{executor.inputCount?.toLocaleString()} 条</strong></p>
-        {limits.length ? <dl className="hawk-executor-start-limits">{limits.map(limit => <div key={limit.label}><dt>{limit.label}</dt><dd>{limit.value}</dd></div>)}</dl> : <Alert type="warning" showIcon message="未设运行上限，将处理全部已有数据。" />}
-        <ul><li>仅处理启动时已有数据，后续新增不自动加入。</li><li>达到任一限制，停止新输入及自动重试；在途任务继续收尾。</li></ul>
-        <details><summary>运行说明</summary><p>平台支持全天候无人看管运行，实际处理时长取决于数据供给。当前演示尚未接入云桶持续遍历与动态感知。</p></details>
+        <p className="hawk-executor-start-input">本轮输入 <strong>{/\.csv(?:$|[?#])/i.test(executor.input ?? '') ? 'CSV：读取校验完成后显示总量' : `${executor.inputCount?.toLocaleString()} 条`}</strong></p>
+        {limits.length > 0 && <dl className="hawk-executor-start-limits">{limits.map(limit => <div key={limit.label}><dt>{limit.label}</dt><dd>{limit.value}</dd></div>)}</dl>}
+        <Alert type="warning" showIcon message={`尚未设置：${missing.join('、')}`} description={missing.length === 3 ? '将持续处理输入来源中全部可用数据，没有费用、数量或时长保护。' : '未设置的项目不提供对应保护；运行仍受其他已设置上限约束。'} />
+        <ul><li>持续接收来源新增数据；暂时无数据时等待，明确供数结束且收尾完毕才完成。</li><li>达到任一限制，停止新输入及自动重试；在途任务继续收尾。</li></ul>
+        <details><summary>运行说明</summary><p>平台支持全天候无人看管运行，实际处理时长取决于数据供给。无输入源活动超时后停止取数并收尾。当前演示使用模拟源事件，未连接真实存储服务。</p></details>
       </div>,
       onOk: () => executeAction(action),
     });
@@ -113,12 +118,12 @@ export function ExecutorWorkbench() {
     if (runtime?.state === 'running') { msg.info('请先暂停执行器，再重试该批次失败数据'); return; }
     Modal.confirm({ title: `重试「${executor.flows[stage]?.name}」的 ${failures} 条失败数据？`, content: '仅重试失败环节，成功后继续下游；原有正常队列和成功结果保留，重试结束后保持暂停。费用继续累计。', okText: '确认重试', cancelText: '取消', onOk: () => { try { writeWorkspace(retryStreamStage(readWorkspace(), id, stage)); } catch (error) { msg.error(error instanceof Error ? error.message : '重试失败'); } } });
   };
-  const primaryAction: ExecutorAction = runtime?.state === 'running' ? 'pause' : runtime?.state === 'paused' ? 'resume' : runtime?.state === 'waiting' ? 'confirm' : 'start';
-  const primaryLabel = executor.runMode === 'stream' && runtime?.state === 'waiting' ? '请在费用详情处理结果' : runtime?.state === 'running' ? '暂停运行' : runtime?.state === 'paused' ? '继续运行' : runtime?.state === 'waiting' ? '确认结束并继续' : runtime?.state === 'completed' ? '运行完成' : runtime?.state === 'ended' ? '执行已结束' : '一键运行';
+  const primaryAction: ExecutorAction = runtime?.state === 'running' ? 'pause' : runtime?.state === 'paused' ? 'resume' : runtime?.state === 'waiting' ? executor.runMode === 'stream' ? 'resume' : 'confirm' : 'start';
+  const primaryLabel = executor.runMode === 'stream' && runtime?.state === 'waiting' ? '继续运行' : runtime?.state === 'running' ? '暂停运行' : runtime?.state === 'paused' ? '继续运行' : runtime?.state === 'waiting' ? '确认结束并继续' : runtime?.state === 'completed' ? '运行完成' : runtime?.state === 'ended' ? '执行已结束' : '一键运行';
   const batchAction = (action: string): ExecutorAction | undefined => BATCH_ACTIONS[action];
 
   return <div className="hawk-executor-workbench">
-    {holder}
+    {holder}<ExecutorDemoDrawer executor={executor} />
     <header className="hawk-executor-header"><Space><Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push(back)}>{executor.projectId ? '返回项目' : '返回工作流列表'}</Button><h1 className="hawk-executor-page-title">{executor.name}</h1>{executor.purpose === 'trial' && <Tag color="purple">试跑执行器</Tag>}<Tag color={runtime?.state === 'running' ? 'processing' : runtime?.state === 'completed' ? 'success' : 'default'}>{STATES[runtime?.state ?? 'ready']}</Tag></Space><Space wrap><ExecutorCloneButton executor={executor} /><span>本地模拟 · 浏览器保存</span></Space></header>
     {storageError && <Alert type="error" showIcon message={storageError} />}
     <div className="hawk-executor-layout">
@@ -133,10 +138,11 @@ export function ExecutorWorkbench() {
           <ol>{batches.map((batch, index) => <li key={batch.id} className={(batch.id === viewed?.id ? 'is-selected ' : '') + (batch.id === current?.id ? 'is-current' : '')}><button aria-label={`查看第${index + 1}步 ${batch.name}`} aria-current={batch.id === viewed?.id ? 'step' : undefined} onClick={() => setViewedBatchId(batch.id)}><span className="hawk-executor-step-number">{batch.status === '已导出' || batch.finish?.phase === 'done' ? <CheckCircleOutlined /> : index + 1}</span><span className="hawk-executor-step-content"><strong>{batch.name}</strong><small>批次 {batch.id}{batch.id === current?.id && !['completed', 'ended'].includes(runtime?.state ?? '') ? ' · 当前执行项' : ''}</small><code>{batch.workflow}</code></span><span className="hawk-executor-step-status" style={{ color: STATUS_PILL[batch.status].color, background: STATUS_PILL[batch.status].bg }}>{batch.status}</span></button></li>)}</ol>
           {!batches.length && <Typography.Text type="secondary">正在准备关联批次…</Typography.Text>}
         </section>
-        <footer className="hawk-executor-sidebar-footer">{executor.runMode !== 'stream' && runtime?.state === 'waiting' && current?.failed > 0 && <Button block onClick={() => runAction('retry')}>重试失败数据（{current.failed} 条）</Button>}<Button aria-label={primaryLabel} block type="primary" size="large" icon={runtime?.state === 'running' ? <PauseOutlined /> : <PlayCircleOutlined />} disabled={Boolean(storageError) || Boolean(runtime?.state === 'waiting' && current?.finish) || !canExecutorAction(workspace, executor, primaryAction)} onClick={() => runAction(primaryAction)}>{primaryLabel}</Button><p>{executor.runMode === 'stream' ? (runtime?.started ? '达到任一运行上限后先完成已取入的数据；是否再投由你决定。' : '启动时确认本轮输入，成本、条数与运行时长上限均可选。') : runtime?.state === 'waiting' ? '核对当前结果后，确认结束并接续下一步。' : runtime?.state === 'paused' ? '当前进度已保留，继续后接着处理。' : runtime?.state === 'completed' ? '全部批次已完成本地模拟，结果可按批次查看。' : runtime?.started ? '按本次执行模式判断是否自动接续。' : '先配置本次输入，再按既定顺序一键运行。'}</p></footer>
+        <footer className="hawk-executor-sidebar-footer">{executor.runMode !== 'stream' && runtime?.state === 'waiting' && current?.failed > 0 && <Button block onClick={() => runAction('retry')}>重试失败数据（{current.failed} 条）</Button>}<Button aria-label={primaryLabel} block type="primary" size="large" icon={runtime?.state === 'running' ? <PauseOutlined /> : <PlayCircleOutlined />} disabled={Boolean(storageError) || Boolean(runtime?.state === 'waiting' && current?.finish) || !canExecutorAction(workspace, executor, primaryAction)} onClick={() => runAction(primaryAction)}>{primaryLabel}</Button><p>{executor.runMode === 'stream' && executor.stream?.reason ? executor.stream.reason : executor.runMode === 'stream' ? (runtime?.started ? '达到任一运行上限后先完成已取入的数据；是否再投由你决定。' : '启动时确认本轮输入，成本、条数与运行时长上限均可选。') : runtime?.state === 'waiting' ? '核对当前结果后，确认结束并接续下一步。' : runtime?.state === 'paused' ? '当前进度已保留，继续后接着处理。' : runtime?.state === 'completed' ? '全部批次已完成本地模拟，结果可按批次查看。' : runtime?.started ? '按本次执行模式判断是否自动接续。' : '先配置本次输入，再按既定顺序一键运行。'}</p></footer>
       </aside>
       <main className="hawk-executor-main" aria-label="执行器批次详情">
         {executor.runMode !== 'stream' && runtime?.state === 'waiting' && <Alert className="hawk-executor-waiting" type={runtime.urgent ? 'error' : 'warning'} showIcon message={runtime.urgent ? '加急 · 需要人工处理（本地提醒）' : '等待人工确认'} description={runtime.reason} />}
+
         {runtime?.phase === 'retrying' && <Alert type="info" showIcon message={`仅重试当前批次失败数据 · 第 ${runtime.retryCounts?.[current?.id] ?? 1} 次（本地模拟）`} />}
         {viewed ? <><div className="hawk-executor-viewing"><span>查看批次 {viewedIndex + 1} / {batches.length}{runtime?.state === 'running' && runtime.phase === 'exporting' && viewed.id === current?.id ? ' · 本地模拟导出中' : ''}{settings.mode === 'target' && currentRate !== null ? ` · 当前批次成功率 ${currentRate.toFixed(1)}%` : ''}</span><div className="hawk-executor-batch-caption"><strong>{viewed.name}</strong><span>批次 ID {viewed.id} · {viewed.workflow}</span></div></div><BatchDetailPanel key={viewed.id} batch={viewed} projectName={workspace.projects.find(project => project.id === executor.projectId)?.name ?? '未关联项目'} onUpdate={updateBatch} execution={{
           runMode: executor.runMode,
@@ -154,9 +160,12 @@ export function ExecutorWorkbench() {
         <p className="hawk-executor-prototype-note">本地模拟不调用算子或模型；交付文件包含合成示例结果。关闭页面后暂停模拟，重新打开后继续。</p>
       </main>
     </div>
-    {settingsOpen && <ExecutorConfiguration executor={executor} onCancel={() => setSettingsOpen(false)} onSave={values => {
-      const configured = configureExecutor(readWorkspace(), id, values);
-      writeWorkspace(setExecutorDelivery(configured, id, values.deliveryMode));
+    {executor.runMode === 'stream' && runtime?.started && streamRunBlockReason(executor) && <Alert type="warning" showIcon message={streamRunBlockReason(executor)} />}
+    {settingsOpen && <ExecutorConfiguration executor={executor} onCancel={() => setSettingsOpen(false)} onSave={async values => {
+      const current = readWorkspace(), latest = current.executors.find(item => item.id === id)!;
+      const configured = configureExecutor(current, id, { ...values, count: latest.runtime?.started ? latest.inputCount! : values.count });
+      const next = runtime?.started ? configured : setExecutorDelivery(configured, id, values.deliveryMode);
+      if (!await writeWorkspace(next)) throw new Error('配置保存失败，原配置已保留，请重试');
       setSettingsOpen(false); setStorageError(''); msg.success('输入及执行器配置已保存到本机');
     }} />}
     <Modal title="执行器输入资源" open={inputPreviewOpen} onCancel={() => setInputPreviewOpen(false)} footer={<Button onClick={() => setInputPreviewOpen(false)}>关闭</Button>}><Typography.Paragraph copyable style={{ overflowWrap: 'anywhere' }}>{executor.input}</Typography.Paragraph><Typography.Text type="secondary">本次执行器的初始输入；后续批次使用前一步成功产出。</Typography.Text></Modal>

@@ -39,6 +39,7 @@ export interface LocalWorkspace { lastSimulationTick?: number; exportJobs?: Expo
 export const WORKSPACE_KEY = 'annotation-demo.local-workspace.v2';
 export const WORKSPACE_EVENT = 'hawk-workspace-change';
 export const WORKSPACE_ERROR_EVENT = 'hawk-workspace-storage-error';
+export const WORKSPACE_RESUME_EVENT = 'hawk-workspace-runtime-resume';
 const DATABASE_NAME = 'annotation-demo.workspace.v2';
 const LEGACY_DATABASE_NAME = 'annotation-demo.workspace.v1';
 const RESULT_STORE = 'batch-results';
@@ -49,6 +50,8 @@ function decodeWorkspace(raw: string): LocalWorkspace {
 }
 const serverSnapshot = initialWorkspace();
 let workspaceCache: LocalWorkspace | undefined;
+let committedWorkspace: LocalWorkspace | undefined;
+let storageEpoch = 0;
 let hydration: Promise<void> | undefined;
 let persistQueue = Promise.resolve();
 let database: Promise<IDBDatabase> | undefined;
@@ -114,6 +117,8 @@ const subscribe = (listener: () => void) => {
   const onStorage = (event: StorageEvent) => {
     if (event.key === WORKSPACE_KEY) {
       workspaceCache = readBaseWorkspace();
+      committedWorkspace = workspaceCache;
+      storageEpoch += 1;
       hydration = undefined;
       void ensureHydrated().catch(() => undefined);
     }
@@ -143,10 +148,13 @@ export function readWorkspace(): LocalWorkspace {
 }
 export function writeWorkspace(next: LocalWorkspace): Promise<boolean> {
   if (typeof window === 'undefined') return Promise.resolve(false);
+  committedWorkspace ??= workspaceCache ?? readBaseWorkspace();
+  const epoch = storageEpoch;
   const normalized = normalizeProjectAssociations(next);
   workspaceCache = normalized;
   announceChange();
   const operation = persistQueue.then(async () => {
+    if (epoch !== storageEpoch) throw new Error('前一次保存失败，请重新操作');
     await ensureHydrated();
     const existingResults = new Map((workspaceCache?.batches ?? []).filter(batch => batch.results).map(batch => [batch.id, batch.results!]));
     const complete = { ...normalized, batches: normalized.batches.map(batch => batch.results === undefined && existingResults.has(batch.id) ? { ...batch, results: existingResults.get(batch.id) } : batch) };
@@ -158,7 +166,8 @@ export function writeWorkspace(next: LocalWorkspace): Promise<boolean> {
       complete.batches.forEach(batch => {
         const results = batch.results ?? [];
         const previousCount = persistedResultCounts.get(batch.id) ?? 0;
-        if (results.length < previousCount) {
+        const previousRows = committedWorkspace?.batches.find(item => item.id === batch.id)?.results ?? [];
+        if (results.length < previousCount || results.length === previousCount && JSON.stringify(results) !== JSON.stringify(previousRows)) {
           store.delete(IDBKeyRange.bound([batch.id, 0], [batch.id, Number.MAX_SAFE_INTEGER]));
           results.forEach((result, position) => store.put({ batchId: batch.id, position, result }));
           changedResultCounts.set(batch.id, results.length);
@@ -173,11 +182,16 @@ export function writeWorkspace(next: LocalWorkspace): Promise<boolean> {
     });
     changedResultCounts.forEach((count, batchId) => persistedResultCounts.set(batchId, count));
     localStorage.setItem(WORKSPACE_KEY, JSON.stringify(compactWorkspace(complete)));
+    committedWorkspace = complete;
     workspaceCache = complete;
     announceChange();
   });
   persistQueue = operation.catch(() => undefined);
-  return operation.then(() => true, () => { announceStorageError(); return false; });
+  return operation.then(() => true, () => {
+    // Discard queued optimistic changes based on a failed save, including runtime ticks.
+    if (epoch === storageEpoch) { storageEpoch += 1; workspaceCache = committedWorkspace; announceChange(); }
+    announceStorageError(); return false;
+  });
 }
 export function saveExecutor(executor: LocalExecutor) {
   const current = readWorkspace();

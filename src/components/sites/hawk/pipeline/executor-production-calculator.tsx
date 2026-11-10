@@ -1,41 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Button, InputNumber, Modal, Segmented, Select, Slider, Space, Tag, Typography } from 'antd';
-import { readWorkspace, writeWorkspace, type LocalExecutor } from '../data/local-workspace';
+import { Button, InputNumber, Modal, Segmented, Select, Slider, Space, Tag } from 'antd';
+import { type LocalExecutor } from '../data/local-workspace';
 import { estimateStreamPlan, estimateStreamProductsByTime, streamCostEvidence } from '../data/executor-stream-estimates';
-import { setStreamLimits } from '../data/executor-streaming';
-import { ExecutorDurationInput } from './executor-duration-input';
-import { ExecutorSettingRow } from './executor-setting-row';
+import { estimateStreamTimeAddition, TIME_ESTIMATE_DEFAULTS } from '../data/executor-time-estimates';
 
 const money = (cents: number) => `¥ ${(cents / 100).toFixed(2)}`;
+const duration = (hours: number) => `${Math.ceil(hours * 60 - 1e-8).toLocaleString()} 分钟`;
+const observedDuration = (hours: number) => hours < 1 / 60 ? `${(hours * 3600).toFixed(1)} 秒` : `${(hours * 60).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 分钟`;
+function TimeResult({ label, value, reason }: { label: string; value?: { base: number; low?: number; high?: number }; reason?: string }) {
+  return <div className="hawk-calculator-time-result"><span>{label}</span><strong>{value ? duration(value.base) : '暂无法估算'}</strong>{value && <small>{value.low === undefined ? '粗估：观测段不足，暂不能确定预留范围。' : value.high === undefined ? `按近期波动至少 ${duration(value.low)}；存在零产出时段，暂不能确定时间上界。` : `按近期波动估算的参考范围：${duration(value.low)} – ${duration(value.high)}`}</small>}{!value && <small>{reason}</small>}</div>;
+}
 export function ExecutorProductionCalculator({ executor: e, onClose }: { executor: LocalExecutor; onClose: () => void }) {
-  const s = e.stream!;
   const [mode, setMode] = useState<'capacity' | 'target'>('capacity');
   const [constraint, setConstraint] = useState<'budget' | 'time' | 'both'>('budget');
   const [spend, setSpend] = useState<number | null>(2000), [target, setTarget] = useState<number | null>(2100), [hours, setHours] = useState<number | null>(8);
-  const [timeUnit, setTimeUnit] = useState<'hours' | 'days'>('hours');
-  const [inputLimit, setInputLimit] = useState<number | undefined>(e.streamPolicy?.inputLimit);
-  const [runtimeMs, setRuntimeMs] = useState<number | undefined>(e.streamPolicy?.runtimeLimitMs);
-  const [limit, setLimit] = useState<number | undefined>(s.costLimitCents === undefined ? undefined : s.costLimitCents / 100);
-  const [error, setError] = useState('');
+  const [timeUnit, setTimeUnit] = useState<'minutes' | 'hours' | 'days'>('minutes');
+  const [showExtra, setShowExtra] = useState(false), [extra, setExtra] = useState<number | null>(0);
   const evidence = streamCostEvidence(e);
   const plan = estimateStreamPlan(e, mode === 'target' ? { products: target ?? NaN } : { budgetYuan: spend ?? NaN });
   const timePlan = estimateStreamProductsByTime(e, hours ?? NaN);
+  const timeAddition = estimateStreamTimeAddition(e, target ?? NaN, extra ?? NaN);
+  const timeEvidence = timeAddition.current.evidence;
+  const combinedCost = showExtra ? estimateStreamPlan(e, { products: (target ?? NaN) + (extra ?? NaN) }) : undefined;
   const timeProducts = constraint === 'both'
     ? plan.products && timePlan.products !== undefined ? Math.min(plan.products.base, timePlan.products) : undefined
     : timePlan.products;
-  const minimumLimit = (s.costCents + 1) / 100;
-  const upperLimit = Math.max(5000, Math.ceil(minimumLimit / 50) * 50, limit ?? 0);
   const invalid = mode === 'target' ? target === null || !Number.isSafeInteger(target) || target < 0 : (constraint !== 'time' && (spend === null || spend < 0)) || (constraint !== 'budget' && (hours === null || hours <= 0));
-  const saveLimit = () => {
-    try {
-      if (limit !== undefined && (!Number.isFinite(limit) || limit < minimumLimit || limit > 100000)) throw new Error('总成本上限须高于当前累计费用，且不超过 ¥100,000；可清空取消上限。');
-      writeWorkspace(setStreamLimits(readWorkspace(), e.id, { costLimitCents: limit === undefined ? undefined : Math.round(limit * 100), inputLimit, runtimeLimitMs: runtimeMs }));
-      onClose();
-    } catch (issue) { setError(issue instanceof Error ? issue.message : '保存失败'); }
-  };
-  return <Modal className="hawk-cost-calculator" title="成本与时间计算器" open centered width={840} okText="保存运行上限" cancelText="关闭" onCancel={onClose} onOk={saveLimit} okButtonProps={{ disabled: ['draining', 'completed'].includes(s.phase) }}>
+  return <Modal className="hawk-cost-calculator" title="成本与时间计算器" open centered width={840} onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
     <div className="hawk-calculator-content">
     <div className="hawk-calculator-evidence"><strong>本地演示观测</strong><span>已收尾 {evidence.samples} / {evidence.threshold} 条</span><span>{evidence.outputs} 份成品</span><span>样本成本 {money(evidence.costCents)}</span><Tag>置信度：未校准</Tag></div>
     <Segmented block aria-label="预测方向" value={mode} onChange={value => setMode(value as typeof mode)} options={[{ value: 'capacity', label: '预算 / 时长 → 产量' }, { value: 'target', label: '目标产量 → 成本 / 时间' }]} />
@@ -46,12 +39,13 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
       <Slider ariaLabelForHandle="调整追加投入" min={0} max={Math.max(5000, spend ?? 0)} step={.01} value={spend ?? 0} onChange={setSpend} marks={{ 0: '0', 2000: '2,000', 5000: '5,000' }} />
     </div>}
     {mode === 'capacity' && constraint !== 'budget' && <div className="hawk-calculator-control">
-      <label htmlFor="production-hours">计划运行时长</label><Space.Compact><InputNumber id="production-hours" aria-label="计划运行时长" min={timeUnit === 'days' ? .01 : .25} max={timeUnit === 'days' ? 30 : 720} step={timeUnit === 'days' ? .25 : 1} value={hours === null ? null : Number((hours / (timeUnit === 'days' ? 24 : 1)).toFixed(4))} onChange={value => setHours(value === null ? null : value * (timeUnit === 'days' ? 24 : 1))} /><Select aria-label="计划运行时长单位" value={timeUnit} onChange={setTimeUnit} options={[{ value: 'hours', label: '小时' }, { value: 'days', label: '天' }]} /></Space.Compact>
-      <Slider ariaLabelForHandle="调整计划运行时长" min={0} max={Math.max(timeUnit === 'days' ? 7 : 24, (hours ?? 0) / (timeUnit === 'days' ? 24 : 1))} step={timeUnit === 'days' ? .25 : 1} value={(hours ?? 0) / (timeUnit === 'days' ? 24 : 1)} onChange={value => setHours(value * (timeUnit === 'days' ? 24 : 1))} marks={timeUnit === 'days' ? { 0: '0', 3: '3', 7: '7' } : { 0: '0', 8: '8', 24: '24' }} />
+      <label htmlFor="production-hours">计划运行时长</label><Space.Compact><InputNumber id="production-hours" aria-label="计划运行时长" min={timeUnit === 'days' ? .01 : .25} max={timeUnit === 'days' ? 30 : timeUnit === 'minutes' ? 43200 : 720} step={timeUnit === 'days' ? .25 : 1} value={hours === null ? null : Number((hours / (timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1)).toFixed(4))} onChange={value => setHours(value === null ? null : value * (timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1))} /><Select aria-label="计划运行时长单位" value={timeUnit} onChange={setTimeUnit} options={[{ value: 'minutes', label: '分钟' }, { value: 'hours', label: '小时' }, { value: 'days', label: '天' }]} /></Space.Compact>
+      <Slider ariaLabelForHandle="调整计划运行时长" min={0} max={Math.max(timeUnit === 'days' ? 7 : timeUnit === 'minutes' ? 1440 : 24, (hours ?? 0) / (timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1))} step={timeUnit === 'days' ? .25 : 1} value={(hours ?? 0) / (timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1)} onChange={value => setHours(value * (timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1))} marks={timeUnit === 'days' ? { 0: '0', 3: '3', 7: '7' } : { 0: '0', 8: '8', 24: '24' }} />
     </div>}
     {mode === 'target' && <div className="hawk-calculator-control">
       <label htmlFor="production-target">目标新增成品</label><Space><InputNumber id="production-target" aria-label="目标新增成品" min={0} max={100000} precision={0} value={target} onChange={setTarget} /><span>份</span></Space>
       <Slider ariaLabelForHandle="调整目标新增成品" min={0} max={Math.max(10000, target ?? 0)} step={1} value={target ?? 0} onChange={setTarget} marks={{ 0: '0', 2100: '2,100', 10000: '10,000' }} />
+      <div className="hawk-calculator-extra"><Button type="link" onClick={() => setShowExtra(value => !value)}>{showExtra ? '收起追加试算' : '再多做多少份'}</Button>{showExtra && <><label htmlFor="production-extra">额外追加成品</label><Space><InputNumber id="production-extra" aria-label="额外追加成品" min={0} max={100000} precision={0} value={extra} onChange={setExtra} /><span>份</span></Space><small>当前方案 {target?.toLocaleString() ?? '—'} 份 + 额外追加 {extra?.toLocaleString() ?? '—'} 份 = 从现在再产出 {target !== null && extra !== null ? (target + extra).toLocaleString() : '—'} 份，不含已有成品。</small></>}</div>
     </div>}
     </div>
     {mode === 'capacity' && constraint !== 'budget' && <p className="hawk-calculator-time-help">平台支持全天候无人看管运行；实际有数据可处理多久取决于输入供给。这里填写累计实际处理时间，暂停、排队和无数据等待不计入。1 天按累计处理 24 小时计算。</p>}
@@ -60,20 +54,20 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
       <strong>{invalid ? '请填写有效数值' : mode === 'capacity' && constraint === 'budget' && plan.products ? `${plan.products.low.toLocaleString()} – ${plan.products.high.toLocaleString()} 份` : mode === 'capacity' && constraint !== 'budget' && timeProducts !== undefined ? `${timeProducts.toLocaleString()} 份` : mode === 'target' && plan.cost ? `${money(plan.cost.low)} – ${money(plan.cost.high)}` : '数据不足，暂无法估算'}</strong>
       <small>{mode === 'capacity' && constraint !== 'budget' ? `${constraint === 'both' && !plan.products ? plan.reason : timePlan.products === undefined ? timePlan.reason : `按已观测吞吐 ${timePlan.rate!.toFixed(1)} 份/小时估算（新配置样本 ${timePlan.observedOutputs} 份 / ${timePlan.observedHours!.toFixed(2)} 小时；剩余输入 ${timePlan.remainingInputs} 条）`}${constraint === 'both' ? '；预算与时长同时约束时取较低产量上限。' : '。'} 仅作本地演示估算，不代表真实生产承诺。` : plan.reason ?? `基准 ${plan.products ? plan.products.base.toLocaleString() + ' 份' : money(plan.cost!.base)} · 同一批已收尾输入的费用与最终成品配对计算，包含失败、重试和多产物。`}</small>
     </div>
-    {mode === 'target' && <div className="hawk-executor-setting-group">
-      <ExecutorSettingRow title="预计任务处理工作量" description="按目标成品量、各阶段通过率与实测处理时长估算。">数据不足</ExecutorSettingRow>
-      <ExecutorSettingRow title="预计实际运行时长" description="还需结合服务限速、可用并发及资源等待。">暂无法估算</ExecutorSettingRow>
-    </div>}
-    <details className="hawk-calculator-coverage"><summary>估算依据与适用范围</summary><p>模型：已收尾输入分组 v1 · 样本 {evidence.samples} 条 / {evidence.groups} 组。区间使用分组单位成本的四分位范围，不是统计置信区间或费用保证。</p><p>当前还可取入 {evidence.remainingInputs.toLocaleString()} 条原始输入。估算假设后续输入与样本分布相近，不保证剩余资源足以达到目标；目标为新增量，不含已交付成品，预计投入也不含已发生费用。</p><p>文件大小、视频时长与编码、资源池、有效 QPS、实际可用并发和生产账单尚未接入，长尾覆盖与预测误差均未验证。成本上限与预测输入独立，调整预测不会启动或修改生产。</p></details>
-    <div className="hawk-calculator-limit"><div><strong>本次总成本上限</strong><small>达到后停止新增输入及重试，在途任务继续收尾，最终费用可能超出上限。</small></div><Space><InputNumber aria-label="本次总成本上限" min={minimumLimit} max={100000} precision={2} placeholder="不设上限" value={limit} onChange={value => { setLimit(value === null ? undefined : value); setError(''); }} /><span>元</span><Button type="link" onClick={() => { setLimit(undefined); setError(''); }}>取消上限</Button></Space><Slider ariaLabelForHandle="调整总成本上限" min={minimumLimit} max={upperLimit} step={.01} disabled={limit === undefined || ['draining', 'completed'].includes(s.phase)} value={limit ?? minimumLimit} onChange={setLimit} /></div>
-    <div className="hawk-calculator-inputs has-two-columns hawk-calculator-additional-limits">
-      <div className="hawk-calculator-control"><label htmlFor="runtime-input-limit">最多取入原始数据（条）</label><InputNumber id="runtime-input-limit" min={1} precision={0} placeholder="留空不限制" value={inputLimit} onChange={value => setInputLimit(value ?? undefined)} /></div>
-      <div className="hawk-calculator-control"><label htmlFor="runtime-hours-limit">累计运行时长上限</label><ExecutorDurationInput id="runtime-hours-limit" value={runtimeMs} onChange={setRuntimeMs} /></div>
-    </div>
-    <p className="hawk-calculator-time-help">时长上限按执行器整体累计，并行环节只计一次。任一上限达到后停止取入新数据及自动重试，在途任务继续收尾。上方预测仅用于试算，运行上限在此单独保存。</p>
-    {['draining', 'completed'].includes(s.phase) && <Alert type="info" showIcon message="当前正在收尾或已完成，可查看预测；运行上限此时不可修改。" />}
-    {error && <Alert role="alert" type="error" showIcon message={error} />}
-    <Typography.Paragraph type="secondary">本页用于原型交互验证。真实成本与时间预测待生产事件、资源元数据和计费口径接入后校准；开始生产不要求先跑样本或人工确认。</Typography.Paragraph>
+    {mode === 'target' && <section className="hawk-calculator-time" aria-label="目标成品时间估算">
+      <div className="hawk-calculator-time-heading"><strong>预计还需有效处理时间</strong><Tag>{timeEvidence.ready ? timeEvidence.completeSegments < TIME_ESTIMATE_DEFAULTS.minimumSegments ? '粗估' : '经验范围 · 未校准' : '等待观测'}</Tag></div>
+      <p>以下时间均从现在起算。暂停、排队和无数据等待不计入，不代表具体交付时刻。</p>
+      <div className={`hawk-calculator-time-grid ${showExtra ? 'has-extra' : ''}`}>
+        <TimeResult label={`当前方案 · 再产出 ${target?.toLocaleString() ?? '—'} 份`} value={timeAddition.current.hours} reason={timeAddition.current.reason} />
+        {showExtra && <><TimeResult label={`追加部分 · 多做 ${extra?.toLocaleString() ?? '—'} 份`} value={timeAddition.incremental} reason={timeAddition.reason ?? timeAddition.combined.reason} /><TimeResult label="追加后累计 · 从现在起" value={timeAddition.reason ? undefined : timeAddition.combined.hours} reason={timeAddition.reason ?? timeAddition.combined.reason} /></>}
+      </div>
+      {timeEvidence.ready && <small className="hawk-calculator-time-basis">{timeEvidence.source === 'synthetic-demo' ? '预置演示观测' : '本地运行观测'} · {timeEvidence.method === 'resource' ? '按资源特征估算' : '按整批产出速度估算'} · {timeEvidence.observedOutputs.toLocaleString()} 份 / {observedDuration(timeEvidence.observedHours)} · 已有 {timeEvidence.completeSegments} 个完整观测段（{TIME_ESTIMATE_DEFAULTS.minimumSegments} 个起显示范围）。{timeEvidence.note}</small>}
+      {timeEvidence.ready && timeEvidence.updatedAt !== undefined && <small>{timeEvidence.source === 'synthetic-demo' ? '演示观测生成时间' : '观测更新时间'}：{new Date(timeEvidence.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}（北京时间）</small>}
+      {showExtra && combinedCost?.cost && <small>追加后累计预计新增投入：{money(combinedCost.cost.low)} – {money(combinedCost.cost.high)}，不含已发生费用。</small>}
+      {(showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning) && <small>{showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning}</small>}
+    </section>}
+    <details className="hawk-calculator-coverage"><summary>估算依据</summary><p>按同一批已收尾输入的实际费用与最终成品计算，包含失败、重试和多产物。首次按输入量 5%（最多 1,000 条），此后按 2%（最多 400 条）刷新；未知总量按 500 / 200 条。时间按有效处理速度估算，排除暂停和等待。</p><p>范围来自近期观测波动；样本不足或零产出时不提供无依据的预测。试算不改变运行配置。</p></details>
+    <p className="hawk-calculator-time-help">原型模拟估算，仅供参考。</p>
     </div>
   </Modal>;
 }

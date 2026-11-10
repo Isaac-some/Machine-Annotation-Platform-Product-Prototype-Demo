@@ -12,10 +12,12 @@ const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2
 const fresh = () => withPhase2Examples({ groups: [], projects: [], executors: [], batches: [] });
 const get = (w, id = 'phase2-demo') => w.executors.find(e => e.id === id);
 const tick = (w, n = 1, id = 'phase2-demo') => { for (let i = 0; i < n; i++) w = S.tickStream(JSON.parse(JSON.stringify(w)), id); return w; };
-const started = (id = 'phase2-demo') => S.startStream(fresh(), id);
+// These finite-source regression cases explicitly announce that no further data will arrive.
+const finiteStart = (w, id) => { const next = S.recordStreamSourceEvent(S.startStream(w, id), id, { kind: 'end' }); get(next, id).stream.source.totalKnown = true; return next; };
+const started = (id = 'phase2-demo') => finiteStart(fresh(), id);
 const sampled = (id = 'phase2-demo') => tick(started(id), 30, id);
 
-test('streaming starts immediately and processes the complete fixed input without a sample gate', () => {
+test('streaming starts immediately and completes a source that explicitly ended without a sample gate', () => {
   let w = started(); assert.equal(get(w).stream.phase, 'production'); assert.equal(get(w).stream.admitted, 0);
   w = tick(w, 200); const completed = get(w);
   assert.equal(completed.stream.admitted, 24); assert.equal(completed.stream.phase, 'completed');
@@ -35,7 +37,7 @@ test('10,000-input demo fixture loads ready without pre-running production ticks
   assert.equal(e.streamPolicy.observationSize, 1000);
 });
 test('workflow revision change restarts the time forecast sample window at the configured step', () => {
-  let w = started(); const e = get(w); e.inputCount = 5000; e.streamPolicy.observationSize = 100;
+  let w = started(); const e = get(w); e.inputCount = 5000; e.stream.source.initialInputCount = 5000; e.streamPolicy.observationSize = 100;
   e.stream.admitted = 500; e.stream.settledInputs = 500; e.stream.activeRunMs = 4 * 3600000;
   e.stream.inputMetrics = Object.fromEntries(Array.from({ length: 500 }, (_, i) => [i + 1, { costCents: 30, finalOutputs: 2 }]));
   e.stream.settledRootIds = Array.from({ length: 500 }, (_, i) => i + 1); e.stream.estimateRootIds = e.stream.settledRootIds.slice();
@@ -53,7 +55,7 @@ test('workflow revision change restarts the time forecast sample window at the c
 });
 test('optional cost ceiling stops new admission, drains in-flight work and leaves room to adjust the cap', () => {
   let w = fresh(); get(w).streamPolicy.costLimitCents = 432; get(w).streamPolicy.reminderRatio = 60;
-  w = S.startStream(w, 'phase2-demo');
+  w = finiteStart(w, 'phase2-demo');
   for (let i = 0; i < 100 && get(w).stream.phase !== 'review'; i++) w = tick(w, 1);
   const s = get(w).stream, admitted = s.admitted;
   assert.equal(s.phase, 'review'); assert(admitted < 24); assert(s.triggerCostCents >= 432); assert(s.drainFinalCents > s.triggerCostCents); assert(s.reminded);
@@ -61,44 +63,32 @@ test('optional cost ceiling stops new admission, drains in-flight work and leave
   w = S.continueStreamManually(w, 'phase2-demo'); w = tick(w, 200);
   assert.equal(get(w).stream.admitted, 24); assert.equal(get(w).stream.phase, 'completed');
 });
-test('continue-on-cap keeps admitting and retrying while recording configured reminder strength', () => {
+test('legacy continue-on-cap becomes a hard stop while retaining reminder strength', () => {
   let w = fresh(); const e = get(w);
   e.streamPolicy.costLimitCents = 432; e.streamPolicy.costLimitAction = 'continue'; e.streamPolicy.reminderRatio = 60;
   e.notification = { baseline: 3, reminder: 2, stop: 1, recipients: '创建人' };
-  w = S.startStream(w, e.id);
-  let admittedAtTrigger = 0;
-  for (let i = 0; i < 200 && get(w).stream.phase !== 'completed'; i++) {
-    w = tick(w, 1);
-    const s = get(w).stream;
-    if (s.triggerCostCents !== undefined && admittedAtTrigger === 0) admittedAtTrigger = s.admitted;
-  }
+  w = tick(finiteStart(w, e.id), 200);
   const result = get(w), prompt = result.stream.costPrompts.find(item => item.text.includes('达到成本上限'));
-  assert.equal(result.stream.triggerCostAction, 'continue');
+  assert.equal(result.stream.triggerCostAction, 'drain');
   assert.equal(prompt.notificationLevel, 3);
-  assert.equal(result.stream.phase, 'completed');
-  assert.equal(result.stream.admitted, 24);
-  assert.equal(result.stream.retryRound, 1);
+  assert.equal(result.stream.phase, 'review');
+  assert(result.stream.admitted < 24); assert.equal(result.stream.retryRound, 0);
   assert(result.stream.costCents > result.stream.triggerCostCents);
-  assert.equal(result.stream.drainFinalCents, undefined);
-  assert(admittedAtTrigger > 0 && admittedAtTrigger < 24);
+  assert.equal(result.stream.drainFinalCents, result.stream.costCents);
 });
-test('continue-on-cap still allows explicit manual recovery of failed stages', () => {
+test('legacy continue-on-cap cannot bypass the ceiling through manual recovery', () => {
   let w = fresh(); const e = get(w);
-  e.streamPolicy.costLimitCents = 1; e.streamPolicy.costLimitAction = 'continue'; e.streamPolicy.maxRetries = 0;
-  w = S.startStream(w, e.id); w = tick(w, 200);
+  e.streamPolicy.costLimitCents = 432; e.streamPolicy.costLimitAction = 'continue'; e.streamPolicy.maxRetries = 0;
+  w = tick(finiteStart(w, e.id), 200);
   const before = get(w), failed = before.stream.failures[0];
-  assert(failed); assert.equal(before.stream.phase, 'review'); assert(before.stream.costCents >= 1);
-  w = S.retryStreamStage(w, e.id, failed.stage);
-  assert(get(w).stream.stageRecovery);
-  w = tick(w, 100);
-  assert.equal(get(w).stream.stageRecovery, undefined);
-  assert(get(w).stream.costCents > before.stream.costCents);
+  assert(failed); assert.equal(before.stream.phase, 'review');
+  assert.throws(() => S.retryStreamStage(w, e.id, failed.stage), /输入及执行器配置/);
 });
 test('manual takeover still records a cap notification when admitted work crosses the limit while draining', () => {
   let w = fresh(); const e = get(w);
   e.streamPolicy.costLimitCents = 50; e.streamPolicy.costLimitAction = 'drain';
   e.notification = { baseline: 1, reminder: 1, stop: 4, recipients: '创建人' };
-  w = S.startStream(w, e.id); w = tick(w, 2); w = S.takeOverStream(w, e.id);
+  w = finiteStart(w, e.id); w = tick(w, 2); w = S.takeOverStream(w, e.id);
   for (let i = 0; i < 50 && get(w).stream.triggerCostCents === undefined; i++) w = tick(w);
   const prompt = get(w).stream.costPrompts.find(item => item.text.includes('达到成本上限'));
   assert(prompt); assert.equal(prompt.notificationLevel, 4);
@@ -107,22 +97,22 @@ test('manual takeover still records a cap notification when admitted work crosse
 test('no cost ceiling is valid and zero deliverables never create a unit-cost estimate', () => {
   let w = started(); assert.equal(get(w).stream.costLimitCents, undefined);
   get(w).stream.demoOutcome = 'zero'; get(w).streamPolicy.maxRetries = 0; w = tick(w, 200);
-  const s = get(w).stream; assert.equal(s.phase, 'review'); assert.equal(s.stages.at(-1).outputs, 0); assert.equal(s.predicted, undefined);
+  const s = get(w).stream; assert.equal(s.phase, 'completed'); assert.equal(s.stages.at(-1).outputs, 0); assert.equal(s.predicted, undefined);
 });
 test('legacy per-output cost bounds are ignored and cannot block stream startup', () => {
   const w = fresh(), policy = get(w).streamPolicy;
   assert.equal(get(w, 'phase2-live').streamPolicy.unitCostMin, undefined);
   policy.unitCostMin = 0; policy.unitCostMax = -1;
   assert.doesNotThrow(() => S.validateStreamPolicy(policy, 24));
-  assert.equal(get(S.startStream(w, 'phase2-demo')).stream.phase, 'production');
+  assert.equal(get(finiteStart(w, 'phase2-demo')).stream.phase, 'production');
 });
 test('finite retries follow the full first pass and zero disables automatic retry', () => {
-  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 100);
-  const e = get(w); assert.equal(e.stream.retryRound, 0); assert(e.stream.failures.length > 0); assert.equal(e.stream.phase, 'review');
+  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(finiteStart(w, 'phase2-demo'), 100);
+  const e = get(w); assert.equal(e.stream.retryRound, 0); assert(e.stream.failures.length > 0); assert.equal(e.stream.phase, 'completed');
   const events = e.stream.events.map(x => x.text); assert(!events.some(x => x.includes('启动第')));
 });
 test('manual stage retry skips upstream work and sends recovered outputs downstream', () => {
-  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(S.startStream(w, 'phase2-demo'), 100);
+  let w = fresh(); get(w).streamPolicy.maxRetries = 0; w = tick(finiteStart(w, 'phase2-demo'), 100);
   const before = get(w), stage = 1, token = before.stream.failures.find(item => item.stage === stage);
   assert(token); const upstreamProcessed = before.stream.stages[0].processed;
   w = S.retryStreamStage(w, before.id, stage);
@@ -170,12 +160,12 @@ test('ordinary paused retry prepares inputs, recovers failed rows first and pres
   assert.equal(b.success, 12); assert.equal(b.failed, 0); assert.equal(b.filtered, 2); assert.equal(b.status, '已暂停'); assert.equal(b.retryTask.recovered, 7);
 });
 test('a paused stream stage blocks upstream admission and resumes without duplicate output', () => {
-  let w = S.startStream(fresh(), 'phase2-demo'); w = tick(w, 3); w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 4);
+  let w = finiteStart(fresh(), 'phase2-demo'); w = tick(w, 3); w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 4);
   const admitted = get(w).stream.admitted; w = tick(w, 8); assert.equal(get(w).stream.admitted, admitted);
   w = S.toggleStreamStage(w, 'phase2-demo', 1); w = tick(w, 100); assert.equal(get(w).stream.phase, 'completed');
 });
 test('manual continuation requires a higher or removed cap and retains cumulative cost', () => {
-  let w = fresh(); get(w, 'phase2-cost').streamPolicy.costLimitCents = 250; w = S.startStream(w, 'phase2-cost');
+  let w = fresh(); get(w, 'phase2-cost').streamPolicy.costLimitCents = 250; w = finiteStart(w, 'phase2-cost');
   for (let i = 0; i < 100 && get(w, 'phase2-cost').stream.phase !== 'review'; i++) w = tick(w, 1, 'phase2-cost');
   const cost = get(w, 'phase2-cost').stream.costCents;
   assert.throws(() => S.continueStreamManually(w, 'phase2-cost'), /提高或取消/);
@@ -183,7 +173,7 @@ test('manual continuation requires a higher or removed cap and retains cumulativ
   assert.equal(get(w, 'phase2-cost').stream.admitted, 24); assert(get(w, 'phase2-cost').stream.costCents > cost);
 });
 test('unknown downstream totals stay unknown until their upstream inputs arrive', () => {
- let w=S.startStream(fresh(),'phase2-cost');w=tick(w,4,'phase2-cost');const ids=get(w,'phase2-cost').runtime.batchIds;
+ let w=finiteStart(fresh(),'phase2-cost');w=tick(w,4,'phase2-cost');const ids=get(w,'phase2-cost').runtime.batchIds;
  assert.equal(w.batches.find(b=>b.id===ids[1]).total,-1);
 });
 
@@ -275,7 +265,7 @@ test('measured execution time counts concurrent stages once, excludes pause, blo
 
 test('input limit stops exactly at admitted count, drains downstream and requires a changed limit before continuation', () => {
   let w = fresh(); get(w).streamPolicy.inputLimit = 3;
-  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  w = tick(finiteStart(w, 'phase2-demo'), 100);
   assert.equal(get(w).stream.admitted, 3); assert.equal(get(w).stream.stopReason, 'input');
   assert.equal(get(w).stream.phase, 'review'); assert(get(w).stream.stages[2].outputs > 0);
   assert.equal(get(w).stream.retryRound, 0);
@@ -287,7 +277,7 @@ test('input limit stops exactly at admitted count, drains downstream and require
 
 test('runtime limit stops admission at real measured time, drains and does not infer time from tick count', () => {
   let w = fresh(); get(w).streamPolicy.runtimeLimitMs = 1900;
-  w = S.startStream(w, 'phase2-demo');
+  w = finiteStart(w, 'phase2-demo');
   w = S.tickStream(w, 'phase2-demo', 800); // No work yet.
   w = S.tickStream(w, 'phase2-demo', 1100);
   w = S.tickStream(w, 'phase2-demo', 800);
@@ -304,7 +294,7 @@ test('runtime limit stops admission at real measured time, drains and does not i
 
 test('output goal stops new admission; supplemental-input contract contains evidence without calculating or dispatching inputs/retries', () => {
   let w = fresh(); get(w).streamPolicy.targetOutputCount = 2; get(w).streamPolicy.maxRetries = 0;
-  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  w = tick(finiteStart(w, 'phase2-demo'), 100);
   const e = get(w); assert.equal(e.stream.stopReason, 'target'); assert(e.stream.admitted < 24);
   assert(e.stream.stages.at(-1).outputs >= 2); assert.equal(e.stream.retryRound, 0);
   const before = JSON.stringify(w), request = S.buildUpstreamInputRequest(e);
@@ -323,22 +313,22 @@ test('percentage output goal uses the fixed input snapshot and converts upward t
   assert.throws(() => S.validateStreamPolicy({ ...policy, targetOutputCount: 5 }, 24));
   assert.throws(() => S.validateStreamPolicy({ maxRetries: 0, targetOutputPercent: 100.1 }, 24));
   let w = fresh(); Object.assign(get(w).streamPolicy, policy);
-  w = tick(S.startStream(w, 'phase2-demo'), 100);
+  w = tick(finiteStart(w, 'phase2-demo'), 100);
   assert.equal(get(w).stream.stopReason, 'target');
   assert(get(w).stream.admitted < 24);
   assert(get(w).stream.stages.at(-1).outputs >= 3);
 });
-test('estimate refresh begins at 1,000 settled inputs and then follows the configured increment', () => {
-  assert.deepEqual(S.estimateRefreshCheckpoints(0, 999, 100), []);
-  assert.deepEqual(S.estimateRefreshCheckpoints(999, 1000, 100), [1000]);
-  assert.deepEqual(S.estimateRefreshCheckpoints(1000, 1200, 100), [1100, 1200]);
-  assert.deepEqual(S.estimateRefreshCheckpoints(1000, 2000, 1000), [2000]);
+test('automatic estimates use bounded percentage checkpoints', () => {
+  assert.deepEqual(S.estimateRefreshCheckpoints(0, 11, 240), []);
+  assert.deepEqual(S.estimateRefreshCheckpoints(11, 22, 240), [12, 17, 22]);
+  assert.deepEqual(S.estimateRefreshCheckpoints(0, 1000, 2000000), [1000]);
+  assert.deepEqual(S.estimateRefreshCheckpoints(1000, 1400, 2000000), [1400]);
 });
 
 const targetReached = (policy = {}) => {
   let w = fresh();
   Object.assign(get(w).streamPolicy, { targetOutputCount: 8, maxRetries: 2 }, policy);
-  w = S.startStream(w, 'phase2-demo');
+  w = finiteStart(w, 'phase2-demo');
   for (let i = 0; i < 100 && get(w).stream.stopReason !== 'target'; i++) w = tick(w);
   assert.equal(get(w).stream.stopReason, 'target');
   assert(get(w).stream.failures.length > 0);
@@ -418,7 +408,7 @@ test('resume boundary excludes the paused portion of a shared driver interval', 
 
 test('a goal above available production never requests more inputs or retries beyond configured policy', () => {
   let w = fresh(); get(w).streamPolicy.targetOutputCount = 1000; get(w).streamPolicy.maxRetries = 0;
-  w = tick(S.startStream(w, 'phase2-demo'), 200);
+  w = tick(finiteStart(w, 'phase2-demo'), 200);
   const e = get(w); assert.equal(e.stream.admitted, 24); assert.equal(e.stream.retryRound, 0);
   assert(e.stream.stages.at(-1).outputs < 1000); assert.match(e.stream.reason, /尚未达到目标/);
   const before = JSON.stringify(w); w = tick(w, 100); assert.equal(JSON.stringify(w), before);

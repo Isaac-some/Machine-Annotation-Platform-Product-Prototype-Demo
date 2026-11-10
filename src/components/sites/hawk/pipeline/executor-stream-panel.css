@@ -56,6 +56,20 @@
 .hawk-calculator-result { display:grid; gap:4px; padding:15px 18px; border-left:3px solid #1d5fbf; background:#f6f9fd; }
 .hawk-calculator-result>span,.hawk-calculator-result small { color:#69717b; }
 .hawk-calculator-result>strong { color:#17191c; font-size:24px; font-variant-numeric:tabular-nums; }
+.hawk-calculator-extra{display:grid;gap:8px;justify-items:start}
+.hawk-calculator-extra>.ant-btn{padding-left:0}
+.hawk-calculator-extra>label{font-weight:600;color:#343a40}
+.hawk-calculator-extra>small{color:#69717b;line-height:1.6}
+.hawk-calculator-time{display:grid;gap:12px;border:1px solid #dde3ea;border-radius:8px;padding:18px}
+.hawk-calculator-time-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hawk-calculator-time p{margin:0;color:#69717b;font-size:13px;line-height:1.6}
+.hawk-calculator-time-grid{display:grid;gap:16px}
+.hawk-calculator-time-grid.has-extra{grid-template-columns:repeat(3,minmax(0,1fr))}
+.hawk-calculator-time-result{display:grid;align-content:start;gap:8px;min-width:0}
+.hawk-calculator-time-result>span{color:#58616c;font-size:13px}
+.hawk-calculator-time-result>strong{font-size:22px;font-variant-numeric:tabular-nums}
+.hawk-calculator-time small{color:#69717b;line-height:1.6}
+@media(max-width:760px){.hawk-calculator-time-grid.has-extra{grid-template-columns:minmax(0,1fr)}}
 .hawk-calculator-limit { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 20px; align-items:center; border-top:1px solid #edf0f2; padding-top:16px; }
 .hawk-calculator-limit>div:first-child { display:grid; gap:4px; }
 .hawk-calculator-limit small { color:#69717b; }
@@ -95,3 +109,10 @@
 .hawk-cost-calculator .ant-modal-body::-webkit-scrollbar-track{background:#f5f7fa}
 .hawk-cost-calculator .ant-modal-body::-webkit-scrollbar-thumb{background:#aeb8c4;border:2px solid #f5f7fa;border-radius:6px}
 .hawk-calculator-additional-limits>.hawk-calculator-control>.ant-input-number{width:100%}
+
+.hawk-stream-source { margin-bottom: 18px; padding: 18px 22px; background: #fff; border: 1px solid #dce4f0; border-radius: 14px; }
+.hawk-stream-source p { margin: 10px 0; color: #596579; }
+.hawk-stream-source summary { margin-top: 12px; cursor: pointer; color: #2456a6; }
+
+.hawk-demo-trigger { position: fixed; right: 24px; bottom: 24px; z-index: 50; box-shadow: 0 4px 18px #182b491c; }
+.hawk-demo-scenario p { font-size: 12px; color: #64748b; margin: 6px 0 0; line-height: 1.6; }

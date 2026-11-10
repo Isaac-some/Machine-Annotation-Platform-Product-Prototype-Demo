@@ -9,7 +9,7 @@ const { streamCostEvidence, estimateStreamPlan, estimateStreamProductsByTime } =
 const { summarizeRunTime } = require('../src/components/sites/hawk/data/executor-run-time.ts');
 const { cloneExecutor } = require('../src/components/sites/hawk/data/executor-runtime.ts');
 const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2-examples.ts');
-const executor = () => ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
+const executor = () => ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { source: { initialInputCount: 20000 }, admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
 
 test('paired settled cohorts exclude in-flight cost and use the same base for both directions', () => {
   const e=executor(), budget=estimateStreamPlan(e,{budgetYuan:20}), target=estimateStreamPlan(e,{products:100});
@@ -41,20 +41,16 @@ test('estimate evidence remains fixed between configured refresh checkpoints', (
   e.stream.inputMetrics[2].costCents=999999; e.stream.inputMetrics[2].finalOutputs=0;
   assert.equal(streamCostEvidence(e).base,before.base);
 });
-test('time forecast uses settled outputs and measured active processing time', () => {
-  const e=executor();e.stream.activeRunMs=2*3600000;
-  assert.deepEqual(estimateStreamProductsByTime(e,4),{products:900,rate:1000,observedOutputs:2000,observedHours:2,remainingInputs:900});
+test('time forecast uses a paired time observation and does not cap products by raw input count', () => {
+  const e=withPhase2Examples({groups:[],projects:[],executors:[],batches:[]}).executors.find(e=>e.id==='phase2-time-basic');
+  const plan=estimateStreamProductsByTime(e,4);
+  assert.equal(plan.rate,60);assert.equal(plan.products,240);assert.equal(plan.observedOutputs,1000);assert.equal(plan.observedHours,1000/60);
+  e.inputCount=1001;assert.equal(estimateStreamProductsByTime(e,4).products,240);
   assert.equal(estimateStreamProductsByTime(e,-1).products,undefined);
-  e.stream.activeRunMs=0;assert.match(estimateStreamProductsByTime(e,4).reason,/缺少/);
-  e.stream.activeRunMs=3600000;Object.values(e.stream.inputMetrics).forEach(row=>row.finalOutputs=0);Object.values(e.stream.estimateMetrics).forEach(row=>row.finalOutputs=0);
-  assert.match(estimateStreamProductsByTime(e,4).reason,/缺少/);
 });
-test('time forecast uses only the latest complete configuration step and its matching runtime window', () => {
-  const e=executor();e.flows=[{id:'flow.a',version:2}];e.stream.estimateConfigKey=JSON.stringify([{id:'flow.a',version:1}]);
-  assert.match(estimateStreamProductsByTime(e,4).reason,/配置已变化/);
-  e.stream.estimateConfigKey=JSON.stringify(e.flows);e.stream.timeEstimateRootIds=[11,12];e.stream.timeEstimateMetrics={11:{finalOutputs:3},12:{finalOutputs:5}};e.stream.estimateWindowActiveRunMs=3600000;e.inputCount=10000;e.stream.admitted=100;
-  const plan=estimateStreamProductsByTime(e,2);
-  assert.equal(plan.observedOutputs,8);assert.equal(plan.observedHours,1);assert.equal(plan.products,16);
+test('a legacy accumulated clock cannot be paired with unrelated cost-sample outputs', () => {
+  const e=executor();e.stream.activeRunMs=3600000;
+  assert.match(estimateStreamProductsByTime(e,4).reason,/同一观测/);
 });
 const pair=(span,kind,start,end,extra={})=>[
   {id:span+'-start',span,kind,edge:'start',at:1000+start,monotonicMs:start,clock:'worker-A',...extra},
