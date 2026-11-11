@@ -7,6 +7,8 @@ import { estimateStreamPlan, estimateStreamProductsByTime, streamCostEvidence } 
 import { estimateStreamTimeAddition, streamForecastSupply, TIME_ESTIMATE_DEFAULTS } from '../data/executor-time-estimates';
 
 const money = (cents: number) => `¥ ${(cents / 100).toFixed(2)}`;
+const costResult = (value: { base: number; low?: number; high?: number }) => value.low === undefined || value.high === undefined ? `${money(value.base)}（基准）` : `${money(value.low)} – ${money(value.high)}`;
+const capacityResult = (value: { base: number; low?: number; high?: number }) => value.low === undefined || value.high === undefined ? `${value.base.toLocaleString()} 份（基准）` : `${value.low.toLocaleString()} – ${value.high.toLocaleString()} 份`;
 const duration = (hours: number) => `${Math.ceil(hours * 60 - 1e-8).toLocaleString()} 分钟`;
 const observedDuration = (hours: number) => hours > 0 && hours * 3600 < .1 ? '不足 0.1 秒' : hours < 1 / 60 ? `${(hours * 3600).toFixed(1)} 秒` : `${(hours * 60).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 分钟`;
 // Labels span the displayed domain, including after a unit change or a large input.
@@ -42,7 +44,7 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
   return <Modal className="hawk-cost-calculator" title="成本与时间计算器" open centered width={840} onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
     <div className="hawk-calculator-content">
     <div className="hawk-calculator-evidence-group">
-      {showCostEvidence && <div className="hawk-calculator-evidence" aria-label="成本观测依据"><strong>成本观测</strong><span>成本样本 {evidence.samples.toLocaleString()} 条输入</span><span>样本成品 {evidence.outputs.toLocaleString()} 份</span><span>样本费用 {money(evidence.costCents)}</span><Tag>{evidence.ready ? '可用于成本试算' : '等待成本样本'}</Tag>{!evidence.ready && <small>{evidence.reason}</small>}</div>}
+      {showCostEvidence && <div className="hawk-calculator-evidence" aria-label="成本观测依据"><strong>成本观测</strong><span>成本样本 {evidence.samples.toLocaleString()} 条输入</span><span>样本成品 {evidence.outputs.toLocaleString()} 份</span><span>样本费用 {money(evidence.costCents)}</span><Tag>{evidence.ready ? evidence.rangeReason ? '基准可用 · 范围未确定' : '可用于成本试算' : '等待成本样本'}</Tag>{!evidence.ready && <small>{evidence.reason}</small>}{evidence.rangeReason && <small>{evidence.rangeReason}</small>}</div>}
       {showTimeEvidence && <div className="hawk-calculator-evidence" aria-label="时间观测依据"><strong>时间观测</strong>{timeEvidence.ready ? <><span>已观测成品 {timeEvidence.observedOutputs} 份</span><span>有效处理 {observedDuration(timeEvidence.observedHours)}</span><Tag>{timeEvidence.completeSegments < TIME_ESTIMATE_DEFAULTS.minimumSegments ? '粗估' : '经验范围 · 未校准'}</Tag></> : <span>{timeEvidence.reason}</span>}</div>}
     </div>
     <Segmented block aria-label="预测方向" value={mode} onChange={value => setMode(value as typeof mode)} options={[{ value: 'capacity', label: '预算 / 时长 → 产量' }, { value: 'target', label: '目标产量 → 成本 / 时间' }]} />
@@ -65,7 +67,7 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
     {mode === 'capacity' && constraint !== 'budget' && <p className="hawk-calculator-time-help">平台支持全天候无人看管运行；实际有数据可处理多久取决于输入供给。这里填写累计实际处理时间，暂停、排队和无数据等待不计入。1 天按累计处理 24 小时计算。</p>}
     <div className="hawk-calculator-result" aria-live="polite">
       <span>{mode === 'target' ? '预计新增投入' : supply.status === 'exhausted' ? '当前输入可新增成品' : '预计产能（供数充足时）'}</span>
-      <strong>{invalid ? '请填写有效数值' : mode === 'capacity' && constraint === 'budget' && plan.products ? `${plan.products.low.toLocaleString()} – ${plan.products.high.toLocaleString()} 份` : mode === 'capacity' && constraint !== 'budget' && timeProducts !== undefined ? `${timeProducts.toLocaleString()} 份` : mode === 'target' && plan.cost ? `${money(plan.cost.low)} – ${money(plan.cost.high)}` : '数据不足，暂无法估算'}</strong>
+      <strong>{invalid ? '请填写有效数值' : mode === 'capacity' && constraint === 'budget' && plan.products ? capacityResult(plan.products) : mode === 'capacity' && constraint !== 'budget' && timeProducts !== undefined ? `${timeProducts.toLocaleString()} 份` : mode === 'target' && plan.cost ? costResult(plan.cost) : '数据不足，暂无法估算'}</strong>
       <small>{invalid ? '请填写范围内的有效数值后再试算。' : mode === 'capacity' && constraint !== 'budget' ? `${constraint === 'both' && !plan.products ? plan.reason : timeBasis ?? supply.message}${constraint === 'both' ? '；预算与时长同时约束时取较低产能。' : '。'}` : costBasis}</small>
     </div>
     {!invalid && <Alert className="hawk-calculator-supply" showIcon type={supply.status === 'waiting' ? 'warning' : 'info'} message={supply.message} />}
@@ -78,10 +80,10 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
       </div>
       {timeEvidence.ready && <small className="hawk-calculator-time-basis">{timeEvidence.source === 'synthetic-demo' ? '预置演示观测' : '本地运行观测'} · {timeEvidence.method === 'resource' ? '按资源特征估算' : '按整批产出速度估算'} · {timeEvidence.observedOutputs.toLocaleString()} 份 / {observedDuration(timeEvidence.observedHours)} · 已有 {timeEvidence.completeSegments} 个完整观测段（{TIME_ESTIMATE_DEFAULTS.minimumSegments} 个起显示范围）。{timeEvidence.note}</small>}
       {timeEvidence.ready && timeEvidence.updatedAt !== undefined && <small>{timeEvidence.source === 'synthetic-demo' ? '演示观测生成时间' : '观测更新时间'}：{new Date(timeEvidence.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}（北京时间）</small>}
-      {showExtra && combinedCost?.cost && <small>追加后累计预计新增投入：{money(combinedCost.cost.low)} – {money(combinedCost.cost.high)}，不含已发生费用。</small>}
+      {showExtra && combinedCost?.cost && <small>追加后累计预计新增投入：{costResult(combinedCost.cost)}，不含已发生费用。</small>}
       {(showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning) && <small>{showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning}</small>}
     </section>}
-    <details className="hawk-calculator-coverage"><summary>估算依据</summary><p>按同一批已收尾输入的实际费用与最终成品计算，包含失败、重试和多产物。首次按输入量 5%（最多 1,000 条），此后按 2%（最多 400 条）刷新；未知总量按 500 / 200 条。时间按有效处理速度估算，排除暂停和等待。</p><p>范围来自近期观测波动；样本不足或零产出时不提供无依据的预测。试算不改变运行配置。</p></details>
+    <details className="hawk-calculator-coverage"><summary>估算依据</summary><p>按同一批已收尾输入的实际费用与最终成品计算，包含失败、重试和多产物。首次按输入量 5%（最多 1,000 条），此后按 2%（最多 400 条）刷新；未知总量按 500 / 200 条。时间按有效处理速度估算，排除暂停和等待。</p><p>基准计入全部样本费用与成品，失败及零产出输入也计入。波动范围只比较完整分组；完整分组零产出时保留基准并说明范围未确定。首次样本不足、整批零成品或配置变化时不提供无依据的预测。试算不改变运行配置。</p></details>
     <p className="hawk-calculator-time-help">原型模拟估算，仅供参考。</p>
     </div>
   </Modal>;

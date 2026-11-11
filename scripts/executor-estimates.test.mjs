@@ -9,6 +9,8 @@ const { streamCostEvidence, estimateStreamPlan, estimateStreamProductsByTime } =
 const { summarizeRunTime } = require('../src/components/sites/hawk/data/executor-run-time.ts');
 const { cloneExecutor } = require('../src/components/sites/hawk/data/executor-runtime.ts');
 const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2-examples.ts');
+const { prepareDemoScenario, beginDemoScenario, DEMO_EXECUTOR_ID } = require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
+const { tickStream, estimateConfigurationKey } = require('../src/components/sites/hawk/data/executor-streaming.ts');
 const executor = () => ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { source: { initialInputCount: 20000 }, admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
 
 test('paired settled cohorts exclude in-flight cost and use the same base for both directions', () => {
@@ -18,9 +20,46 @@ test('paired settled cohorts exclude in-flight cost and use the same base for bo
   assert.deepEqual(estimateStreamPlan(e,{budgetYuan:20}).products,budget.products);
   assert.equal(streamCostEvidence(e).remainingInputs,900);
 });
-test('zero-output cohorts are retained and block an optimistic forecast', () => {
+test('complete zero-output groups retain their costs and the baseline without inventing a finite range', () => {
   const e=executor();for(let i=2;i<=101;i++)e.stream.estimateMetrics[i].finalOutputs=0;
-  const evidence=streamCostEvidence(e);assert.equal(evidence.emptyGroups,1);assert.equal(evidence.ready,false);assert.equal(estimateStreamPlan(e,{budgetYuan:20}).products,undefined);
+  const evidence=streamCostEvidence(e);assert.equal(evidence.emptyGroups,1);assert.equal(evidence.ready,true);
+  assert.equal(evidence.base,40000/1800);assert.equal(evidence.low,undefined);assert.equal(evidence.high,undefined);
+  assert.match(evidence.rangeReason,/零产出/);
+  assert.deepEqual(estimateStreamPlan(e,{budgetYuan:20}).products,{base:90,low:undefined,high:undefined});
+  assert.deepEqual(estimateStreamPlan(e,{products:100}).cost,{base:2223,low:undefined,high:undefined});
+});
+test('an incomplete zero-output tail affects the baseline but does not invalidate complete-group ranges', () => {
+  const e=executor();e.stream.source.initialInputCount=240;e.stream.estimateRootIds=e.stream.estimateRootIds.slice(0,17);
+  e.stream.estimateMetrics[e.stream.estimateRootIds.at(-1)].finalOutputs=0;
+  const evidence=streamCostEvidence(e);
+  assert.equal(evidence.ready,true);assert.equal(evidence.emptyGroups,0);assert.equal(evidence.groups,8);
+  assert.equal(evidence.base,680/32);assert.equal(evidence.high,680/32);
+  assert.equal(estimateStreamPlan(e,{budgetYuan:20}).products.base,94);
+});
+test('a wholly zero-output sample still cannot forecast cost or capacity', () => {
+  const e=executor();Object.values(e.stream.estimateMetrics).forEach(row=>row.finalOutputs=0);
+  assert.equal(streamCostEvidence(e).ready,false);
+  assert.equal(estimateStreamPlan(e,{budgetYuan:20}).products,undefined);
+  assert.equal(estimateStreamPlan(e,{products:100}).cost,undefined);
+});
+test('live small-batch forecasts never disappear as failed tail inputs arrive at refresh checkpoints', () => {
+  for(const elapsed of [0,120000]){
+    let w=beginDemoScenario(prepareDemoScenario(withPhase2Examples({groups:[],projects:[],executors:[],batches:[]}),'phase2-reservoir','estimate'),DEMO_EXECUTOR_ID),observed=false;
+    for(let tick=0;tick<300;tick++){
+      const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),evidence=streamCostEvidence(e);
+      if(evidence.samples>=12 && evidence.outputs>0){
+        observed=true;assert.equal(evidence.ready,true,`forecast disappeared at ${evidence.samples} samples`);
+        assert(Number.isFinite(estimateStreamPlan(e,{budgetYuan:1577.54}).products?.base));
+      }
+      w=tickStream(w,DEMO_EXECUTOR_ID,elapsed);
+    }
+    assert(observed);
+  }
+});
+test('changing a workflow invalidates the cost baseline as well as its range', () => {
+  const e=executor();e.stream.estimateConfigKey=estimateConfigurationKey(e);e.flows=[{id:'changed-workflow'}];
+  assert.equal(streamCostEvidence(e).ready,false);
+  assert.match(estimateStreamPlan(e,{budgetYuan:20}).reason,/配置已变化/);
 });
 test('small, missing, invalid and zero-cost samples do not produce Infinity or a fake range', () => {
   for(const mutate of [e=>e.stream.estimateRootIds.pop(),e=>delete e.stream.estimateMetrics[2],e=>e.stream.estimateMetrics[2].costCents=-1,e=>Object.values(e.stream.estimateMetrics).forEach(r=>r.costCents=0)]) {
