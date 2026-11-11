@@ -1,6 +1,6 @@
 # 机器标注平台产品原型
 
-评审时打开 [在线演示首页](https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/)；保持平台原界面，点击左下圆球打开「演示与验收」，选择功能后自动准备数据并跳转；正式PRD的功能说明旁也提供直达链接。GitHub 仓库页面是代码入口，GitHub Pages 才是可操作网页。
+评审时打开 [在线演示首页](https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/)；保持平台原界面，点击左下圆球打开「演示与验收」，选择功能后只准备数据并跳转，手动点「开始演示」才推进；正式PRD的功能说明旁也提供直达链接。GitHub 仓库页面是代码入口，GitHub Pages 才是可操作网页。
 
 正式需求见飞书：[需求总览及 E4](https://fyze31atzb.feishu.cn/docx/BzMZd9CVLoNxtPxx4b2czeronse)、[E1](https://fyze31atzb.feishu.cn/docx/GijVd2PMmoqERgx9nGPc5Cpsnkb)、[E2](https://fyze31atzb.feishu.cn/docx/HNQldQdiJoRswBxFPvRcmOxXn3c)、[E3](https://fyze31atzb.feishu.cn/docx/HD6Zdm3cCoBAvCxVWtdcwsqNnje)、[演示验收清单](https://fyze31atzb.feishu.cn/docx/WxdVdbmIeoNurGxUuvkcPHn0nOg)。
 

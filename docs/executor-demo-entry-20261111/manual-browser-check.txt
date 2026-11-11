@@ -1,0 +1,8 @@
+CSV: selection + 4.5s wait + refresh do not read; manual Start enables reading
+cost: manually started → boundary → drained → stable fees in 6667 ms
+time: manually started → boundary → drained → stable fees in 6248 ms
+target: manually started → boundary → drained → stable fees in 7381 ms
+input: manually started → boundary → drained → stable fees in 6226 ms
+end: source event deferred until manual Start
+idle: source event deferred until manual Start
+error: source event deferred until manual Start

@@ -1,14 +1,15 @@
 import type { LocalWorkspace } from './local-workspace';
 import { changeExecutorState, cloneExecutor, configureExecutor } from './executor-runtime';
 import { executorSettings } from './executor-settings';
-import { startStream, tickStream, recordStreamSourceEvent } from './executor-streaming';
+import { startStream, tickStream, recordStreamSourceEvent, resumeStream } from './executor-streaming';
+import { cloneWorkspace } from './delivery';
 
 export const DEMO_BOUNDARY_CIDS = { cost: 'CID://demo-cost-limit', time: 'CID://demo-time-limit', target: 'CID://demo-output-limit', input: 'CID://demo-input-limit' } as const;
 export const DEMO_EXECUTOR_ID = 'executor-demo-showcase';
 export const DEMO_SCENARIOS = [
   { id: 'cost', title: '费用触顶与收尾', expected: '接近上限开始，费用触顶后停止取入，在途继续收尾' },
   { id: 'input', title: '原始数据取入上限', expected: '再取入 3 条即停止新增；输入量与成品量分别统计' },
-  { id: 'target', title: '达到目标成品量', expected: '再产出 3 份达到目标，已取入数据继续完成' },
+  { id: 'target', title: '达到目标成品量', expected: '再产出 2 份达到目标，已取入数据继续完成' },
   { id: 'time', title: '实际运行时长上限', expected: '再处理约 2.4 秒触顶，暂停等待不计入' },
   { id: 'estimate', title: '小批次自动预估', expected: '240 条输入，12 条收尾首次估算，此后约每 5 条刷新' },
   { id: 'cid', title: 'CID 输入与持续生产', expected: 'CID 来源逐条接续，可暂停后继续' },
@@ -38,19 +39,29 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   if (scenario === 'zero') e.stream!.demoOutcome = 'zero';
   const warmup = scenario === 'cost' ? 550 : ['csv', 'csv-invalid'].includes(scenario) ? 0 : ['estimate', 'cid'].includes(scenario) ? 12 : 32;
   for (let i = 0; i < warmup; i++) { demo = tickStream(demo, DEMO_EXECUTOR_ID, 1200); if (i % 4 === 0) yield; }
+  // Prepare a settled checkpoint through the real processing path. Keep only
+  // the small amount of new work after Start for the boundary demonstration.
+  if (scenario in DEMO_BOUNDARY_CIDS) {
+    demo.executors[0].stream!.control = 'manual';
+    while (demo.executors[0].stream!.queues.some(queue => queue.length)) {
+      demo = tickStream(demo, DEMO_EXECUTOR_ID, 1200); yield;
+    }
+    const settled = demo.executors[0];
+    settled.stream!.control = 'automatic'; settled.stream!.phase = 'production';
+    settled.runtime!.state = 'running';
+  }
   e = demo.executors[0];
   const s = e.stream!, p = e.streamPolicy!;
-  if (scenario === 'cost') { p.costLimitCents = s.costCents + 60; p.reminderRatio = 99; s.costLimitCents = p.costLimitCents; }
+  if (scenario === 'cost') { p.costLimitCents = s.costCents + 20; p.reminderRatio = 99; s.costLimitCents = p.costLimitCents; }
   if (scenario === 'input') p.inputLimit = s.admitted + 3;
-  if (scenario === 'target') p.targetOutputCount = s.stages.at(-1)!.outputs + 3;
+  if (scenario === 'target') p.targetOutputCount = s.stages.at(-1)!.outputs + 2;
   if (scenario === 'time') p.runtimeLimitMs = s.activeRunMs! + 2400;
   if (scenario === 'retry') {
     demo = changeExecutorState(demo, DEMO_EXECUTOR_ID, 'pause');
     demo.executors[0].stream!.reason = '演示准备完成，请在批次操作中重试失败数据';
   }
-  if (scenario === 'end') demo = recordStreamSourceEvent(demo, DEMO_EXECUTOR_ID, { kind: 'end' });
-  if (scenario === 'error') demo = recordStreamSourceEvent(demo, DEMO_EXECUTOR_ID, { kind: 'error', message: '演示：输入源暂不可用' });
-  if (scenario === 'idle') demo = tickStream(demo, DEMO_EXECUTOR_ID, 0, s.source!.lastActivityAt + 600001);
+  if (demo.executors[0].runtime!.state !== 'paused') demo = changeExecutorState(demo, DEMO_EXECUTOR_ID, 'pause');
+  demo.executors[0].stream!.demoPlayback = { scenario, awaitingStart: true };
   // Reuse batch identities so repeated demonstrations cannot grow browser storage.
   const previous = workspace.executors.find(e => e.id === DEMO_EXECUTOR_ID);
   const foreignIds = new Set(workspace.batches.filter(b => b.executorId !== DEMO_EXECUTOR_ID).map(b => b.id));
@@ -68,6 +79,23 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   // Pause other demos: switching must not accumulate background simulation load.
   const executors = workspace.executors.filter(e => e.id !== DEMO_EXECUTOR_ID).map(e => e.runtime?.state === 'running' ? { ...e, runtime: { ...e.runtime, state: 'paused' as const } } : e);
   return { ...workspace, executors: [...executors, ...demo.executors], batches: [...workspace.batches.filter(b => b.executorId !== DEMO_EXECUTOR_ID), ...demo.batches] };
+}
+
+/** Selecting a scene prepares it; only an explicit user action plays it. */
+export function beginDemoScenario(workspace: LocalWorkspace, id: string): LocalWorkspace {
+  const prepared = workspace.executors.find(e => e.id === id);
+  if (!prepared?.stream?.demoPlayback?.awaitingStart) throw new Error('请先选择一个待开始的演示');
+  const scenario = prepared.stream.demoPlayback.scenario;
+  let next = cloneWorkspace(workspace);
+  next.executors.find(e => e.id === id)!.stream!.demoPlayback!.awaitingStart = false;
+  // Recovery is already staged with real failed rows; the user chooses which
+  // stage to retry instead of accidentally resuming the whole executor.
+  if (scenario === 'retry') return next;
+  next = resumeStream(next, id);
+  if (scenario === 'end') next = recordStreamSourceEvent(next, id, { kind: 'end' });
+  if (scenario === 'error') next = recordStreamSourceEvent(next, id, { kind: 'error', message: '演示：输入源暂不可用' });
+  if (scenario === 'idle') next = tickStream(next, id, 0, next.executors.find(e => e.id === id)!.stream!.source!.lastActivityAt + 600001);
+  return next;
 }
 
 export function prepareDemoScenario(workspace: LocalWorkspace, sourceId: string, scenario: DemoScenario): LocalWorkspace {

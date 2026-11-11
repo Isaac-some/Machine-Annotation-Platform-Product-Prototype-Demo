@@ -41,6 +41,7 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
   const [open, setOpen] = useState(['details', 'calculator'].includes(query.get('panel') ?? '')), [calculatorOpen, setCalculatorOpen] = useState(query.get('panel') === 'calculator'), [msg, holder] = message.useMessage();
   const act = (fn: (w: ReturnType<typeof readWorkspace>, id: string) => ReturnType<typeof readWorkspace>) => { try { writeWorkspace(fn(readWorkspace(), e.id)); } catch (issue) { msg.error(issue instanceof Error ? issue.message : '操作失败'); } };
   const s = e.stream;
+  const inFlight = new Set(s?.queues.flat().map(token => token.root) ?? []).size;
   const stages = e.flows.map((flow, index) => ({ key: index, name: flow.name, ...(s?.stages[index] ?? { processed: 0, failed: 0, outputs: 0, costCents: 0 }), queued: (s?.queues[index]?.length ?? 0) + (s?.stageRecovery?.queues[index]?.length ?? 0) }));
   const finalOutputs = stages.at(-1)?.outputs ?? 0, observed = s?.settledInputs ?? 0, total = e.inputCount ?? 0;
   const cost = s?.costCents ?? 0, cap = s?.costLimitCents ?? e.streamPolicy?.costLimitCents;
@@ -57,14 +58,15 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
     </button>
     <Modal title="累计费用与运行详情" className="hawk-stream-detail-modal" centered open={open} onCancel={() => setOpen(false)} footer={<Button onClick={() => setOpen(false)}>关闭</Button>} width={1120}>
       <section className="hawk-stream-panel" aria-label="执行器成本与运行">
-        <div className="hawk-stream-heading"><div className="hawk-stream-title"><strong>{s ? e.runtime?.state === 'paused' ? '已暂停' : s.source?.waiting && s.phase === 'production' ? '等待新数据' : PHASES[s.phase] : '等待开始运行'}</strong>{s && <Tag>{s.stageRecovery ? '失败数据重试中' : s.control === 'manual' ? '人工控制' : '自动连续'}</Tag>}</div><span className="hawk-stream-data-source">本地模拟数据</span></div>
+        <div className="hawk-stream-heading"><div className="hawk-stream-title"><strong>{s ? s.demoPlayback?.awaitingStart ? '待开始演示' : e.runtime?.state === 'paused' ? '已暂停' : s.source?.waiting && s.phase === 'production' ? '等待新数据' : PHASES[s.phase] : '等待开始运行'}</strong>{s && <Tag>{s.demoPlayback?.awaitingStart ? '尚未开始' : s.phase === 'draining' || s.phase === 'review' ? '已停止新增' : s.stageRecovery ? '失败数据重试中' : s.control === 'manual' ? '人工控制' : '自动连续'}</Tag>}</div><span className="hawk-stream-data-source">本地模拟数据</span></div>
         <div className="hawk-stream-bento">
           <div className="hawk-stream-spend"><span>实际累计费用</span><strong>{money(cost)}</strong><div><span>{cap ? `成本上限 ${money(cap)}` : '未设置成本上限'}</span></div>{cap && <Progress percent={Math.min(100, Number((cost / cap * 100).toFixed(1)))} showInfo={false} strokeColor="#273444" />}<small>{s?.retryRound ?? 0} / {e.streamPolicy?.maxRetries ?? 0} 轮自动重试 · 费用包含失败与重试</small>{s && <Button className="hawk-stream-estimate-button" onClick={() => setCalculatorOpen(true)}>投入与产量试算</Button>}</div>
           <div className="hawk-stream-output"><span>可交付成品</span><strong>{finalOutputs.toLocaleString()}<small> 份</small></strong>{effectiveTargetOutputCount(e.streamPolicy ?? { maxRetries: 0 }, s?.source?.initialInputCount ?? e.inputCount ?? 0) && <span>目标 {effectiveTargetOutputCount(e.streamPolicy ?? { maxRetries: 0 }, s?.source?.initialInputCount ?? e.inputCount ?? 0)?.toLocaleString()} 份{e.streamPolicy?.targetOutputPercent !== undefined ? `（本轮输入 ${e.streamPolicy.targetOutputPercent.toFixed(1)}%）` : ''}</span>}<span>实际单份成本 {finalOutputs ? `¥ ${(cost / finalOutputs / 100).toFixed(4)}` : '—'}</span></div>
           <div className="hawk-stream-completion"><div><span>已完成输入</span><strong>{observed.toLocaleString()} <small>/ {s?.source?.totalKnown === false ? '读取后显示' : total.toLocaleString()} 条</small></strong></div><Progress percent={s?.source?.totalKnown === false ? 0 : total ? Math.round(observed / total * 100) : 0} strokeColor="#1d5fbf" /></div>
           </div>
         {s?.reason && <Alert type={s.phase === 'draining' || s.phase === 'review' ? 'warning' : 'info'} showIcon message={s.reason} />}
-        {s?.reminded && <Alert type="warning" showIcon message={`费用已达到成本上限的 ${e.streamPolicy?.reminderRatio}%，触发提前提醒；提醒不会暂停运行。`} />}
+        {s?.phase === 'draining' && <Alert type="info" showIcon message={`已停止新增取入 · 已取入 ${s.admitted} 条 · 在途剩余 ${inFlight} 条原始输入`} description="剩余在途处理仍会产生费用；收尾完成后费用停止增加，并等待人工决定。" />}
+        {s?.reminded && !s.stopReason && <Alert type="warning" showIcon message={`费用已达到成本上限的 ${e.streamPolicy?.reminderRatio}%，触发提前提醒；提醒不会暂停运行。`} />}
         {s?.triggerCostCents !== undefined && <Descriptions size="small" bordered column={3} items={[{ key: 'trigger', label: '触发费用', children: money(s.triggerCostCents) }, { key: 'extra', label: s.triggerCostAction === 'continue' ? '触顶后新增费用' : '收尾新增费用', children: money((s.drainFinalCents ?? cost) - s.triggerCostCents) }, { key: 'total', label: s.drainFinalCents === undefined ? '当前费用' : '收尾最终费用', children: money(s.drainFinalCents ?? cost) }]} />}
         {s?.phase === 'review' && <Alert type="info" showIcon message="取数已暂停。需要调整上限时，请回主界面打开“输入及执行器配置”；保存后在主界面手动继续。" />}
         {(s?.stageRecovery?.preparation ?? s?.preparation) !== undefined && <div><Typography.Text>失败输入准备进度</Typography.Text><Progress percent={s?.stageRecovery?.preparation ?? s?.preparation} /></div>}
@@ -77,7 +79,7 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
           { title: '成功产物', dataIndex: 'outputs', align: 'right', render: (value: number) => value.toLocaleString() },
           { title: '处理中 / 排队', dataIndex: 'queued', align: 'right' },
           { title: '环节费用', dataIndex: 'costCents', align: 'right', render: money },
-          { title: '操作', key: 'action', width: 130, render: (_, row) => <Button size="small" disabled={!row.failed} onClick={() => retry(row.key)}>重试失败数据</Button> },
+          { title: '操作', key: 'action', width: 130, render: (_, row) => <Button size="small" disabled={!row.failed || Boolean(s?.demoPlayback?.awaitingStart)} onClick={() => retry(row.key)}>重试失败数据</Button> },
         ]} />
       </section>
     </Modal>

@@ -24,6 +24,7 @@ export type StreamPolicy = {
 export type StreamToken = { key: string; root: number; stage: number; attempt: number };
 export type StreamStage = { processed: number; failed: number; outputs: number; costCents: number };
 export type StreamRun = {
+  demoPlayback?: { scenario: string; awaitingStart: boolean };
   timeObservation?: TimeObservation;
   resourceTimeEvidence?: ResourceTimeEvidence;
   /** Optional authoritative trace. The tick simulator never invents processing durations. */
@@ -250,7 +251,7 @@ function sync(w: LocalWorkspace, e: LocalExecutor) {
 /** Synthetic local costs/outcomes only. Every admitted input runs without a sample gate. */
 export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs = 0, observedAt?: number): LocalWorkspace {
   const original = w.executors.find(x => x.id === id);
-  if (!original?.stream || original.runtime?.state !== 'running') return w;
+  if (!original?.stream || original.stream.demoPlayback?.awaitingStart || original.runtime?.state !== 'running') return w;
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e.stream!, p = e.streamPolicy!, bs = batchesFor(next, e);
   const now = observedAt ?? Date.now();
   s.inputMetrics ??= {}; s.settledRootIds ??= [];

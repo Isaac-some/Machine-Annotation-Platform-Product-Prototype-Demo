@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,f);
 const {withPhase2Examples}=require('../src/components/sites/hawk/data/phase2-examples.ts');
-const {DEMO_SCENARIOS,DEMO_BOUNDARY_CIDS,DEMO_EXECUTOR_ID,prepareDemoScenario}=require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
+const {DEMO_SCENARIOS,DEMO_BOUNDARY_CIDS,DEMO_EXECUTOR_ID,prepareDemoScenario,beginDemoScenario}=require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
 const S=require('../src/components/sites/hawk/data/executor-streaming.ts');
 const O=require('../src/components/sites/hawk/data/executor-observation.ts');
 const fresh=()=>withPhase2Examples({groups:[],projects:[],executors:[],batches:[]});
@@ -19,6 +19,11 @@ test('known, unknown and huge observation totals stay bounded',()=>{
 });
 for(const scenario of DEMO_SCENARIOS)test(`demo reaches expected state within six driver ticks: ${scenario.id}`,()=>{
  let w=prepareDemoScenario(fresh(),'phase2-reservoir',scenario.id);
+ const snapshot=JSON.stringify(w);
+ for(let i=0;i<20;i++)w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
+ assert.equal(JSON.stringify(w),snapshot,'selecting a scene must not advance before a manual start');
+ assert.equal(w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).runtime.state,'paused');
+ w=beginDemoScenario(w,DEMO_EXECUTOR_ID);
  for(let i=0;i<6;i++)w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
  const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),s=e.stream;
  if(DEMO_BOUNDARY_CIDS[scenario.id])assert.equal(e.input,DEMO_BOUNDARY_CIDS[scenario.id]);
@@ -39,7 +44,7 @@ test('switching scenarios reuses batches and does not run the previous demo in b
  let w=prepareDemoScenario(fresh(),'phase2-reservoir','cost');const ids=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).runtime.batchIds.slice(),count=w.batches.length;
  for(const id of ['zero','csv','input','cost'])w=prepareDemoScenario(w,DEMO_EXECUTOR_ID,id);
  assert.equal(w.batches.length,count);assert.deepEqual(w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).runtime.batchIds,ids);
- assert.equal(w.executors.filter(e=>e.runtime?.state==='running').length,1);
+ assert.equal(w.executors.filter(e=>e.runtime?.state==='running').length,0);
 });
 test('demo batch identities never collide with other executors and legacy collisions are repaired',()=>{
  let w=fresh();
@@ -65,6 +70,7 @@ test('demo batch identities never collide with other executors and legacy collis
 });
 test('retry fixture exposes failed rows and clears only the stage being recovered',()=>{
  let w=prepareDemoScenario(fresh(),'phase2-reservoir','retry');
+ w=beginDemoScenario(w,DEMO_EXECUTOR_ID);
  const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),ids=e.runtime.batchIds;
  const first=w.batches.find(b=>b.id===ids[0]).failureDetails;
  const second=w.batches.find(b=>b.id===ids[1]);
@@ -74,4 +80,23 @@ test('retry fixture exposes failed rows and clears only the stage being recovere
  w=S.retryStreamStage(w,DEMO_EXECUTOR_ID,1);
  assert.deepEqual(w.batches.find(b=>b.id===ids[1]).failureDetails,[]);
  assert.deepEqual(w.batches.find(b=>b.id===ids[0]).failureDetails,first);
+});
+test('cost demo reaches the boundary, drains completely within 10 seconds and then stops spending',()=>{
+ let w=beginDemoScenario(prepareDemoScenario(fresh(),'phase2-reservoir','cost'),DEMO_EXECUTOR_ID),admitted,remaining;
+ for(let i=0;i<8;i++){
+  w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
+  const s=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).stream;
+  if(s.stopReason==='cost'){
+   admitted??=s.admitted;assert.equal(s.admitted,admitted,'no new input after the boundary');
+   const roots=new Set(s.queues.flat().map(t=>t.root)).size;
+   if(remaining!==undefined)assert(roots<=remaining,'in-flight original inputs must converge');
+   remaining=roots;
+  }
+ }
+ assert.notEqual(admitted,undefined);
+ const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID);
+ assert.equal(e.stream.phase,'review');assert.equal(e.runtime.state,'waiting');assert.equal(remaining,0);
+ const cost=e.stream.costCents;
+ for(let i=0;i<10;i++)w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
+ assert.equal(w.executors.find(e=>e.id===DEMO_EXECUTOR_ID).stream.costCents,cost);
 });
