@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,f);
 const {withPhase2Examples}=require('../src/components/sites/hawk/data/phase2-examples.ts');
-const {DEMO_SCENARIOS,DEMO_EXECUTOR_ID,prepareDemoScenario}=require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
+const {DEMO_SCENARIOS,DEMO_BOUNDARY_CIDS,DEMO_EXECUTOR_ID,prepareDemoScenario}=require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
 const S=require('../src/components/sites/hawk/data/executor-streaming.ts');
 const O=require('../src/components/sites/hawk/data/executor-observation.ts');
 const fresh=()=>withPhase2Examples({groups:[],projects:[],executors:[],batches:[]});
@@ -21,6 +21,7 @@ for(const scenario of DEMO_SCENARIOS)test(`demo reaches expected state within si
  let w=prepareDemoScenario(fresh(),'phase2-reservoir',scenario.id);
  for(let i=0;i<6;i++)w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
  const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),s=e.stream;
+ if(DEMO_BOUNDARY_CIDS[scenario.id])assert.equal(e.input,DEMO_BOUNDARY_CIDS[scenario.id]);
  if(['cost','input','time','target','idle'].includes(scenario.id))assert.equal(s.stopReason,scenario.id);
  if(scenario.id==='csv')assert.equal(s.source.totalKnown,true);
  if(scenario.id==='csv-invalid')assert.match(s.source.error,/RowKey/);
@@ -61,4 +62,16 @@ test('demo batch identities never collide with other executors and legacy collis
  e.runtime.batchIds[0]=w.batches.find(b=>b.executorId!==DEMO_EXECUTOR_ID).id;
  w=prepareDemoScenario(w,DEMO_EXECUTOR_ID,'retry');
  assert.equal(new Set(w.batches.map(b=>b.id)).size,w.batches.length);
+});
+test('retry fixture exposes failed rows and clears only the stage being recovered',()=>{
+ let w=prepareDemoScenario(fresh(),'phase2-reservoir','retry');
+ const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),ids=e.runtime.batchIds;
+ const first=w.batches.find(b=>b.id===ids[0]).failureDetails;
+ const second=w.batches.find(b=>b.id===ids[1]);
+ assert.equal(second.failureDetails.length,2);
+ assert.equal(second.failureDetails.length,second.failed);
+ assert(second.failureDetails.every(row=>row.nodeSeq===-1),'synthetic failures must not invent an operator location');
+ w=S.retryStreamStage(w,DEMO_EXECUTOR_ID,1);
+ assert.deepEqual(w.batches.find(b=>b.id===ids[1]).failureDetails,[]);
+ assert.deepEqual(w.batches.find(b=>b.id===ids[0]).failureDetails,first);
 });

@@ -236,6 +236,11 @@ function sync(w: LocalWorkspace, e: LocalExecutor) {
   batches.forEach((b, i) => {
     const stage = s.stages[i]; b.total = i === 0 ? s.source?.totalKnown === false ? -1 : e.inputCount! : s.admitted === e.inputCount && ['review', 'completed'].includes(s.phase) ? stage.processed : -1;
     b.success = Math.max(0, stage.processed - stage.failed); b.failed = stage.failed; b.cost = `¥ ${(stage.costCents / 100).toFixed(2)}`;
+    // The simulator knows the failed stage and row, but has no operator trace.
+    b.failureDetails = s.failures.filter(token => token.stage === i).map(token => ({
+      nodeSeq: -1, rowkey: token.key, errorCode: 'DEMO_PROCESSING_FAILURE',
+      message: '合成处理失败；可从本环节重试，未提供真实算子定位。',
+    }));
     b.progress = b.total > 0 ? Math.min(100, Math.round(stage.processed / b.total * 100)) : 0;
     b.status = e.runtime!.state === 'paused' || s.pausedStages?.includes(i) ? '已暂停' : s.phase === 'draining' ? '收尾中' : s.phase === 'review' ? '已暂停' : s.phase === 'completed' ? '已完成' : '运行中';
     b.inputResource = i ? `CID://stream/${e.id}/${batches[i - 1].id}` : e.input ?? '';

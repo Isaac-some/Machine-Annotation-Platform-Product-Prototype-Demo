@@ -1,0 +1,218 @@
+[
+  {
+    "document": "E1",
+    "function": "E1.3-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=cost"
+  },
+  {
+    "document": "E1",
+    "function": "E1.4-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=details"
+  },
+  {
+    "document": "E1",
+    "function": "E1.5-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=time"
+  },
+  {
+    "document": "E1",
+    "function": "E1.6-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=calculator"
+  },
+  {
+    "document": "E1",
+    "function": "E1.7-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=details"
+  },
+  {
+    "document": "E1",
+    "function": "E1.8-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=cost"
+  },
+  {
+    "document": "E1",
+    "function": "E1.9-F01",
+    "label": "查看关联达限场景（飞书反馈卡片尚未接入） →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=cost"
+  },
+  {
+    "document": "E1",
+    "function": "E1.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=insufficient&panel=configuration"
+  },
+  {
+    "document": "E1",
+    "function": "E1.1-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=insufficient&panel=configuration"
+  },
+  {
+    "document": "E1",
+    "function": "E1.2-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=details"
+  },
+  {
+    "document": "E1",
+    "function": "E1.2-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=details"
+  },
+  {
+    "document": "E1",
+    "function": "E1.2-F03",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=details"
+  },
+  {
+    "document": "E2",
+    "function": "E2.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry"
+  },
+  {
+    "document": "E2",
+    "function": "E2.2-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry"
+  },
+  {
+    "document": "E3",
+    "function": "E3.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=clone"
+  },
+  {
+    "document": "E3",
+    "function": "E3.2-F01",
+    "label": "查看克隆配置（真实字段依赖检查待联调） →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=clone"
+  },
+  {
+    "document": "E3",
+    "function": "E3.2-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry&panel=clone"
+  },
+  {
+    "document": "B1",
+    "function": "B1.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=delivery-demo&example=delivery"
+  },
+  {
+    "document": "B1",
+    "function": "B1.1-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=delivery-demo&example=delivery"
+  },
+  {
+    "document": "B1",
+    "function": "B1.2-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.2-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.2-F03",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.2-F04",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.3-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.3-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.3-F03",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.4-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B1",
+    "function": "B1.4-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=export"
+  },
+  {
+    "document": "B2",
+    "function": "B2.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&executorId=executor-demo-showcase&stage=1&demo=retry&panel=failure"
+  },
+  {
+    "document": "B2",
+    "function": "B2.2-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=retry"
+  },
+  {
+    "document": "B2",
+    "function": "B2.3-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=alarm"
+  },
+  {
+    "document": "B2",
+    "function": "B2.3-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=alarm"
+  },
+  {
+    "document": "B2",
+    "function": "B2.3-F03",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=alarm"
+  },
+  {
+    "document": "B3",
+    "function": "B3.1-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/pipeline/executor/?id=executor-demo-showcase&demo=time"
+  },
+  {
+    "document": "B3",
+    "function": "B3.2-F01",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=config"
+  },
+  {
+    "document": "B3",
+    "function": "B3.2-F02",
+    "label": "查看此功能演示 →",
+    "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/hawk/project/batch/?id=234&batchId=5889&example=delivery&panel=config"
+  }
+]

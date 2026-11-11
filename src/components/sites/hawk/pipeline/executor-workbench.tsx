@@ -17,7 +17,6 @@ import { executorSettings, batchSuccessRate } from '../data/executor-settings';
 import './executor-workbench.css';
 import { retryStreamStage, toggleStreamStage, streamRunBlockReason } from '../data/executor-streaming';
 import { ExecutorStreamPanel, ExecutorCloneButton } from './executor-stream-panel';
-import { ExecutorDemoDrawer } from './executor-demo-drawer';
 import { withPhase2Examples } from '../data/phase2-examples';
 
 const STATES = { ready: '待执行', running: '运行中', paused: '已暂停', waiting: '待人工确认', completed: '已完成', ended: '已结束' } as const;
@@ -46,7 +45,7 @@ export function ExecutorWorkbench() {
   const executor = workspace.executors.find(item => item.id === id);
   const runtime = executor?.runtime;
   const [viewedBatchId, setViewedBatchId] = useState<number | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(query.get('panel') === 'configuration');
   const [inputPreviewOpen, setInputPreviewOpen] = useState(false);
   const [storageError, setStorageError] = useState('');
   const [msg, holder] = message.useMessage();
@@ -123,7 +122,7 @@ export function ExecutorWorkbench() {
   const batchAction = (action: string): ExecutorAction | undefined => BATCH_ACTIONS[action];
 
   return <div className="hawk-executor-workbench">
-    {holder}<ExecutorDemoDrawer executor={executor} />
+    {holder}
     <header className="hawk-executor-header"><Space><Button type="text" icon={<ArrowLeftOutlined />} onClick={() => router.push(back)}>{executor.projectId ? '返回项目' : '返回工作流列表'}</Button><h1 className="hawk-executor-page-title">{executor.name}</h1>{executor.purpose === 'trial' && <Tag color="purple">试跑执行器</Tag>}<Tag color={runtime?.state === 'running' ? 'processing' : runtime?.state === 'completed' ? 'success' : 'default'}>{STATES[runtime?.state ?? 'ready']}</Tag></Space><Space wrap><ExecutorCloneButton executor={executor} /><span>本地模拟 · 浏览器保存</span></Space></header>
     {storageError && <Alert type="error" showIcon message={storageError} />}
     <div className="hawk-executor-layout">

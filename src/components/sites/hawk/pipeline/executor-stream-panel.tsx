@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Alert, Button, Descriptions, Input, Modal, Progress, Switch, Table, Tag, Typography, message } from 'antd';
 import { CopyOutlined } from '@ant-design/icons';
 import { useRouter } from '@/lib/demo-navigation';
@@ -13,7 +14,8 @@ const PHASES = { production: '连续生产', draining: '收尾中', review: '等
 const money = (cents: number) => `¥ ${(cents / 100).toFixed(2)}`;
 
 export function ExecutorCloneButton({ executor }: { executor: LocalExecutor }) {
-  const router = useRouter(), [open, setOpen] = useState(false), [name, setName] = useState(''), [config, setConfig] = useState(true), [input, setInput] = useState(false), [error, setError] = useState('');
+  const query = useSearchParams();
+  const router = useRouter(), [open, setOpen] = useState(query.get('panel') === 'clone'), [name, setName] = useState(`${executor.name} · 克隆`), [config, setConfig] = useState(true), [input, setInput] = useState(false), [error, setError] = useState('');
   return <><Button aria-label="克隆执行器" icon={<CopyOutlined />} onClick={() => { setError(''); setOpen(true); setName(`${executor.name} · 克隆`); }}>克隆执行器</Button><Modal title="克隆配置预览" open={open} onCancel={() => setOpen(false)} okText="创建新执行器" onOk={() => {
     try { const w = readWorkspace(), next = cloneExecutor(w, executor.id, { name, includeInput: input, includeConfiguration: config }); writeWorkspace(next); setOpen(false); router.push(`/hawk/pipeline/executor/?id=${next.executors.at(-1)!.id}`); } catch (e) { setError(e instanceof Error ? e.message : '克隆失败'); }
   }}>
@@ -35,7 +37,8 @@ export function ExecutorCloneButton({ executor }: { executor: LocalExecutor }) {
 }
 
 export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }) {
-  const [open, setOpen] = useState(false), [calculatorOpen, setCalculatorOpen] = useState(false), [msg, holder] = message.useMessage();
+  const query = useSearchParams();
+  const [open, setOpen] = useState(['details', 'calculator'].includes(query.get('panel') ?? '')), [calculatorOpen, setCalculatorOpen] = useState(query.get('panel') === 'calculator'), [msg, holder] = message.useMessage();
   const act = (fn: (w: ReturnType<typeof readWorkspace>, id: string) => ReturnType<typeof readWorkspace>) => { try { writeWorkspace(fn(readWorkspace(), e.id)); } catch (issue) { msg.error(issue instanceof Error ? issue.message : '操作失败'); } };
   const s = e.stream;
   const stages = e.flows.map((flow, index) => ({ key: index, name: flow.name, ...(s?.stages[index] ?? { processed: 0, failed: 0, outputs: 0, costCents: 0 }), queued: (s?.queues[index]?.length ?? 0) + (s?.stageRecovery?.queues[index]?.length ?? 0) }));

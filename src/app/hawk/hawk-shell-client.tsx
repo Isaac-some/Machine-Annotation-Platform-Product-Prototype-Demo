@@ -1,5 +1,6 @@
 "use client";
 
+import { DemoLauncher } from '@/components/sites/hawk/demo-launcher';
 import dynamic from "next/dynamic";
 import { Alert } from 'antd';
 import { useWorkspaceRuntime } from '@/components/sites/hawk/data/use-workspace-runtime';
@@ -14,5 +15,5 @@ const HawkShell = dynamic(() => import("@/components/sites/hawk/hawk-shell").the
 
 export function HawkShellClient({ children }: { children: React.ReactNode }) {
   const runtimeError = useWorkspaceRuntime();
-  return <HawkShell>{runtimeError && <Alert type="error" role="alert" message={runtimeError} />}{children}</HawkShell>;
+  return <HawkShell>{runtimeError && <Alert type="error" role="alert" message={runtimeError} />}{children}<DemoLauncher /></HawkShell>;
 }

@@ -1,0 +1,12 @@
+CID boundary cost CID://demo-cost-limit cost
+CID boundary time CID://demo-time-limit time
+CID boundary target CID://demo-output-limit target
+Direct link panel calculator
+Direct link panel clone
+Direct link panel configuration
+Direct link panel details
+Batch direct panel export
+Batch direct panel config
+Batch direct panel alarm
+Fresh storage direct link works
+fresh-storage batch failure deep link shows 2 failed rows

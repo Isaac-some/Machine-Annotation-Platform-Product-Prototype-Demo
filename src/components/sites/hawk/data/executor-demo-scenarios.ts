@@ -3,6 +3,7 @@ import { changeExecutorState, cloneExecutor, configureExecutor } from './executo
 import { executorSettings } from './executor-settings';
 import { startStream, tickStream, recordStreamSourceEvent } from './executor-streaming';
 
+export const DEMO_BOUNDARY_CIDS = { cost: 'CID://demo-cost-limit', time: 'CID://demo-time-limit', target: 'CID://demo-output-limit', input: 'CID://demo-input-limit' } as const;
 export const DEMO_EXECUTOR_ID = 'executor-demo-showcase';
 export const DEMO_SCENARIOS = [
   { id: 'cost', title: '费用触顶与收尾', expected: '接近上限开始，费用触顶后停止取入，在途继续收尾' },
@@ -30,7 +31,7 @@ function* prepareDemoScenarioSteps(workspace: LocalWorkspace, sourceId: string, 
   let demo: LocalWorkspace = { ...workspace, executors: [source], batches: workspace.batches.filter(b => source.runtime?.batchIds.includes(b.id)) };
   demo = cloneExecutor(demo, source.id, { id: DEMO_EXECUTOR_ID, name: `演示 · ${DEMO_SCENARIOS.find(s => s.id === scenario)!.title}`, includeConfiguration: true, includeInput: false });
   const count = ['insufficient', 'end', 'idle', 'error'].includes(scenario) ? 6 : scenario === 'retry' ? 12 : scenario === 'cost' ? 1000 : 240;
-  demo = configureExecutor(demo, DEMO_EXECUTOR_ID, { resource: scenario === 'cid' ? 'CID://demo-fixed-input' : scenario === 'csv-invalid' ? 'tos://demo/executor/missing-rowkey.csv' : scenario === 'retry' ? 'tos://demo/executor/retry-input.csv' : count === 6 ? 'tos://demo/executor/sample-six.csv' : scenario === 'cost' ? 'tos://demo/executor/cost-input.csv' : 'tos://demo/executor/rowkey-input.csv', count, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0 } });
+  demo = configureExecutor(demo, DEMO_EXECUTOR_ID, { resource: scenario in DEMO_BOUNDARY_CIDS ? DEMO_BOUNDARY_CIDS[scenario as keyof typeof DEMO_BOUNDARY_CIDS] : scenario === 'cid' ? 'CID://demo-fixed-input' : scenario === 'csv-invalid' ? 'tos://demo/executor/missing-rowkey.csv' : scenario === 'retry' ? 'tos://demo/executor/retry-input.csv' : count === 6 ? 'tos://demo/executor/sample-six.csv' : scenario === 'cost' ? 'tos://demo/executor/cost-input.csv' : 'tos://demo/executor/rowkey-input.csv', count, resourceType: 'video', settings: executorSettings(), runMode: 'stream', streamPolicy: { maxRetries: 0 } });
   demo = { ...demo, executors: demo.executors.filter(e => e.id === DEMO_EXECUTOR_ID), batches: demo.batches.filter(b => b.executorId === DEMO_EXECUTOR_ID) };
   demo = startStream(demo, DEMO_EXECUTOR_ID);
   let e = demo.executors[0];

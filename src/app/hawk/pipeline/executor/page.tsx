@@ -1,4 +1,6 @@
 "use client";
+import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { ExecutorWorkbench } from '@/components/sites/hawk/pipeline/executor-workbench';
-export default function ExecutorPage() { return <Suspense><ExecutorWorkbench /></Suspense>; }
+function Content() { const q = useSearchParams(); return <ExecutorWorkbench key={`${q.get('id')}:${q.get('panel')}`} />; }
+export default function ExecutorPage() { return <Suspense><Content /></Suspense>; }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Alert, Button, ConfigProvider, Drawer, Dropdown, Empty, Modal, Progress, Radio, Select, Space, Switch, Table, Tag, Typography, message } from 'antd';
 import { CalendarOutlined, CheckOutlined, DatabaseOutlined, DownOutlined, DownloadOutlined, ExportOutlined, HistoryOutlined, OrderedListOutlined, StopOutlined, UnorderedListOutlined } from '@ant-design/icons';
@@ -89,15 +90,16 @@ function ExportTimeline({ jobs, firstResultAt, now, range }: { jobs: ExportJob[]
 }
 
 export function DeliveryControls({ batchId, executorId }: { batchId?: number; executorId?: string }) {
+  const query = useSearchParams();
   const workspace = useWorkspace(), [msg, holder] = message.useMessage();
-  const [open, setOpen] = useState(false), [historyOpen, setHistoryOpen] = useState(false);
+  const [open, setOpen] = useState(query.get('panel') === 'export'), [historyOpen, setHistoryOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | undefined>(batchId);
   const [scope, setScope] = useState<'all' | 'time'>('all');
   const [endAtNow, setEndAtNow] = useState(false);
   const [start, setStart] = useState<number | null>(null), [end, setEnd] = useState<number | null>(null), [sorted, setSorted] = useState(true);
-  const [anchor, setAnchor] = useState(0);
+  const [anchor, setAnchor] = useState(() => query.get('panel') === 'export' ? Date.now() : 0);
   const [error, setError] = useState('');
-  const requestId = useRef(''), submitting = useRef(false);
+  const requestId = useRef(query.get('panel') === 'export' ? crypto.randomUUID() : ''), submitting = useRef(false);
   const ids = workspace.executors.find(item => item.id === executorId)?.runtime?.batchIds ?? [];
   const candidates = batchId !== undefined ? workspace.batches.filter(item => item.id === batchId) : ids.map(id => workspace.batches.find(item => item.id === id)).filter(item => item !== undefined);
   const selected = candidates.find(item => item.id === selectedId);

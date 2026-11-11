@@ -45,7 +45,9 @@ export function BatchDetailPage() {
   const query = useSearchParams();
   const params = { id: query.get("id") ?? "234", batchId: query.get("batchId") ?? "" };
   const router = useRouter();
-  const projectId = Number(params.id), batchId = Number(params.batchId);
+  const projectId = Number(params.id);
+  const demoExecutor = workspace.executors.find(item => item.id === query.get('executorId'));
+  const batchId = demoExecutor?.runtime?.batchIds[Number(query.get('stage') ?? 0)] ?? Number(params.batchId);
   const showExample = query.get('example') === 'delivery';
   useEffect(() => {
     if (!showExample) return;
@@ -53,9 +55,9 @@ export function BatchDetailPage() {
     if (next !== current) writeWorkspace(next);
   }, [showExample]);
   const batch = workspace.batches.find(item => item.id === batchId && item.projectId === projectId);
-  if (!batch) return <div style={{ padding: 24 }}>批次不存在（本地项目：{params.id}，批次：{params.batchId}）</div>;
+  if (!batch) return <div style={{ padding: 24 }}>{query.get('demo') ? '正在准备演示数据…' : `批次不存在（本地项目：${params.id}，批次：${params.batchId}）`}</div>;
   const workbench = () => router.push('/hawk/pipeline/executor?id=' + encodeURIComponent(batch.executorId!));
-  return <>{batch.executorId && <Alert type="info" message="此批次由执行器统一调度，前往工作台操作运行和输入。" action={<Button onClick={workbench}>打开执行器</Button>} />}<BatchDetailPanel key={batch.id} batch={batch} projectName={workspace.projects.find(item => item.id === projectId)?.name ?? '-'}
+  return <>{batch.executorId && <Alert type="info" message="此批次由执行器统一调度，前往工作台操作运行和输入。" action={<Button onClick={workbench}>打开执行器</Button>} />}<BatchDetailPanel key={`${batch.id}:${query.get('panel')}`} batch={batch} projectName={workspace.projects.find(item => item.id === projectId)?.name ?? '-'}
     execution={batch.executorId ? { runMode: workspace.executors.find(e => e.id === batch.executorId)?.runMode, inputSource: batch.inputFromBatchId ? `来自本执行器 Batch ${batch.inputFromBatchId}` : '本次输入', waiting: !batch.inputResource, canAction: () => false, onAction: workbench, onEditInput: workbench, inputEditable: false } : undefined}
     onUpdate={patch => { const current = readWorkspace(); writeWorkspace({ ...current, batches: current.batches.map(item => item.id === batch.id ? { ...item, ...patch } : item) }); }}
     breadcrumb={<Breadcrumb items={[{ title: <a onClick={() => router.push('/hawk/project')}>项目管理</a> }, { title: <a onClick={() => router.push('/hawk/project/detail/' + projectId)}>项目详情</a> }, { title: '批次详情' }]} />} /></>;
@@ -80,15 +82,16 @@ export function BatchDetailPanel({ batch, projectName, onUpdate, breadcrumb, exe
   batch: BatchRow; projectName: string; onUpdate: (patch: Partial<BatchRow>) => void;
   breadcrumb?: ReactNode; execution?: BatchExecutionContext;
 }) {
+  const query = useSearchParams();
   const batchId = batch.id;
   const configurationReadOnly = batch.status !== '初始化' || Boolean(execution && !execution.inputEditable);
   const [msg, contextHolder] = message.useMessage();
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [draftFields, setDraftFields] = useState<Array<string | undefined>>([]);
-  const [configOpen, setConfigOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(query.get('panel') === 'config');
   const [noticeOpen, setNoticeOpen] = useState(false);
-  const [alarmOpen, setAlarmOpen] = useState(false);
-  const [failureDetailsOpen, setFailureDetailsOpen] = useState(false);
+  const [alarmOpen, setAlarmOpen] = useState(query.get('panel') === 'alarm');
+  const [failureDetailsOpen, setFailureDetailsOpen] = useState(query.get('panel') === 'failure');
   const [configForm] = Form.useForm<BatchSystemConfig>();
   const [costTarget, setCostTarget] = useState<"batch" | number | null>(null);
   const [inputOpen, setInputOpen] = useState(false);
