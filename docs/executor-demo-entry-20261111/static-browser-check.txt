@@ -10,3 +10,4 @@ Batch direct panel config
 Batch direct panel alarm
 Fresh storage direct link works
 fresh-storage batch failure deep link shows 2 failed rows
+Rapid cost → time → target: final target scene retained; abandoned preparation cannot clear a newer scene query.

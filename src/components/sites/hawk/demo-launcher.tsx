@@ -26,11 +26,14 @@ export function DemoLauncher() {
         const prepared = await prepareDemoScenarioAsync(withPhase2Examples(readWorkspace()), 'phase2-reservoir', scenario.id);
         if (cancelled) return;
         if (!await writeWorkspace(prepared)) throw new Error('演示数据保存失败，请重试');
-        const url = new URL(window.location.href); url.searchParams.delete('demo');
+        if (cancelled) return;
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('demo') !== scene) return;
+        url.searchParams.delete('demo');
         window.history.replaceState(null, '', url.href);
         setError('');
-      } catch (e) { setError(e instanceof Error ? e.message : '演示准备失败'); }
-      finally { pending.current = ''; }
+      } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : '演示准备失败'); }
+      finally { if (pending.current === scene) pending.current = ''; }
     })();
     return () => { cancelled = true; pending.current = ''; };
   }, [scene]);
