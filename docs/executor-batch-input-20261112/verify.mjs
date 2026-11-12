@@ -1,5 +1,9 @@
-const {chromium}=require('/Users/isaac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
-const fs=require('fs'),assert=require('assert/strict'),path=require('path');
+import {chromium} from '/Users/isaac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const __dirname=path.dirname(fileURLToPath(import.meta.url));
 (async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{const p=await b.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:1.5});
  await p.goto(process.env.CHECK_URL||'http://127.0.0.1:3057/hawk/pipeline/executor/?id=phase2-time-basic&example=phase2');
  await p.getByRole('button',{name:'输入及执行器配置',exact:true}).waitFor();
