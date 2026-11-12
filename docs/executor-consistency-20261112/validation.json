@@ -285,5 +285,7 @@
     "sha256": "49d6ca65e0cfd8319409bce95ccfe5672d067697038fc66e35ee9e2380efff65",
     "bytes": 195338,
     "ROOTRevision": 150
-  }
+  },
+  "onlineBrowser": "passed",
+  "verifiedRuntimeCommit": "2a537b72efd930d5cbe21e9cdca4d51f1f8f5b25"
 }

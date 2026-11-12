@@ -1,0 +1,160 @@
+{
+  "verifiedRuntimeCommit": "2a537b72efd930d5cbe21e9cdca4d51f1f8f5b25",
+  "url": "https://isaac-some.github.io/Machine-Annotation-Platform-Product-Prototype-Demo/",
+  "deployment": "success",
+  "completeBrowserFlow": {
+    "passed": true,
+    "errors": [],
+    "checks": [
+      "quantity-only editable target",
+      "save never resumes",
+      "resume confirmation cancellation",
+      "shared cost/time evidence",
+      "calculator link preserves saved values",
+      "simultaneous limits require all clear",
+      "limit pause opens explanation with configure, estimate and close; no quick editor or page banner",
+      "resume action and pause",
+      "end cancellation and permanent source closure across refresh",
+      "1920/1440/1024 configuration"
+    ],
+    "screenshots": [
+      "01-overview.png",
+      "02-configuration.png",
+      "03-resume-confirm.png",
+      "04-shared-calculator.png",
+      "05-config-from-calculator.png",
+      "06-limit-notice.png",
+      "07-end-confirm.png",
+      "08-ended.png",
+      "09-config-1024.png",
+      "09-config-1440.png",
+      "09-config-1920.png",
+      "10-start-confirm.png",
+      "11-formulas.png",
+      "12-limit-paused.png",
+      "13-limit-calculator.png",
+      "14-limit-configuration.png",
+      "15-unlimited-resume.png"
+    ]
+  },
+  "unlimitedCopyAndTypography": {
+    "passed": true,
+    "sizes": [
+      {
+        "width": 1440,
+        "box": {
+          "x": 420,
+          "y": 100,
+          "width": 600,
+          "height": 550.375
+        },
+        "styles": {
+          ".ant-modal-confirm-title": {
+            "size": "18px",
+            "weight": "600",
+            "color": "rgba(0, 0, 0, 0.88)"
+          },
+          ".hawk-executor-resume-unlimited>strong": {
+            "size": "16px",
+            "weight": "600",
+            "color": "rgb(32, 42, 56)"
+          },
+          ".hawk-executor-resume-unlimited>p": {
+            "size": "14px",
+            "weight": "400",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-message": {
+            "size": "13px",
+            "weight": "500",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-description": {
+            "size": "12px",
+            "weight": "400",
+            "color": "rgb(104, 115, 132)"
+          }
+        }
+      },
+      {
+        "width": 1280,
+        "box": {
+          "x": 340,
+          "y": 100,
+          "width": 600,
+          "height": 550.375
+        },
+        "styles": {
+          ".ant-modal-confirm-title": {
+            "size": "18px",
+            "weight": "600",
+            "color": "rgba(0, 0, 0, 0.88)"
+          },
+          ".hawk-executor-resume-unlimited>strong": {
+            "size": "16px",
+            "weight": "600",
+            "color": "rgb(32, 42, 56)"
+          },
+          ".hawk-executor-resume-unlimited>p": {
+            "size": "14px",
+            "weight": "400",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-message": {
+            "size": "13px",
+            "weight": "500",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-description": {
+            "size": "12px",
+            "weight": "400",
+            "color": "rgb(104, 115, 132)"
+          }
+        }
+      },
+      {
+        "width": 1024,
+        "box": {
+          "x": 212,
+          "y": 100,
+          "width": 600,
+          "height": 550.375
+        },
+        "styles": {
+          ".ant-modal-confirm-title": {
+            "size": "18px",
+            "weight": "600",
+            "color": "rgba(0, 0, 0, 0.88)"
+          },
+          ".hawk-executor-resume-unlimited>strong": {
+            "size": "16px",
+            "weight": "600",
+            "color": "rgb(32, 42, 56)"
+          },
+          ".hawk-executor-resume-unlimited>p": {
+            "size": "14px",
+            "weight": "400",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-message": {
+            "size": "13px",
+            "weight": "500",
+            "color": "rgb(83, 96, 113)"
+          },
+          ".ant-alert-description": {
+            "size": "12px",
+            "weight": "400",
+            "color": "rgb(104, 115, 132)"
+          }
+        }
+      }
+    ],
+    "checks": [
+      "unlimited copy on all unset only",
+      "configured target does not claim unlimited",
+      "modal in viewport on 1440/1280/1024",
+      "typography hierarchy"
+    ]
+  },
+  "note": "End confirmation assertion waits for the async save to finish and the dialog to close before reading persisted state."
+}
