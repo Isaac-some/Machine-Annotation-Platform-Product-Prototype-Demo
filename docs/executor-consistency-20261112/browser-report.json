@@ -1,0 +1,35 @@
+{
+  "passed": true,
+  "errors": [],
+  "checks": [
+    "quantity-only editable target",
+    "save never resumes",
+    "resume confirmation cancellation",
+    "shared cost/time evidence",
+    "calculator link preserves saved values",
+    "simultaneous limits require all clear",
+    "limit pause opens explanation with configure, estimate and close; no quick editor or page banner",
+    "resume action and pause",
+    "end cancellation and permanent source closure across refresh",
+    "1920/1440/1024 configuration"
+  ],
+  "screenshots": [
+    "01-overview.png",
+    "02-configuration.png",
+    "03-resume-confirm.png",
+    "04-shared-calculator.png",
+    "05-config-from-calculator.png",
+    "06-limit-notice.png",
+    "07-end-confirm.png",
+    "08-ended.png",
+    "09-config-1024.png",
+    "09-config-1440.png",
+    "09-config-1920.png",
+    "10-start-confirm.png",
+    "11-formulas.png",
+    "12-limit-paused.png",
+    "13-limit-calculator.png",
+    "14-limit-configuration.png",
+    "15-unlimited-resume.png"
+  ]
+}

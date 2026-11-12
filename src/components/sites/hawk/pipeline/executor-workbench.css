@@ -76,3 +76,30 @@
 .hawk-executor-start-notice details{font-size:13px;color:#586573}
 .hawk-executor-start-notice summary{cursor:pointer}
 .hawk-executor-start-notice details p{margin-top:8px}
+
+.hawk-executor-sidebar-footer>.ant-btn+.ant-btn{margin-top:8px}
+.hawk-executor-unset-limits{padding-left:20px;color:#946200;font-size:13px;line-height:1.8;margin:12px 0}
+.hawk-executor-resume-notice dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+.hawk-executor-resume-notice dt{color:#64748b}.hawk-executor-resume-notice dd{margin:0;text-align:right}
+.hawk-executor-limit-notice .ant-modal-body{line-height:1.75}
+.hawk-executor-limit-notice .ant-modal-body p{margin:12px 0}
+.hawk-executor-limit-notice .ant-modal-body ul{list-style:disc;padding-left:22px;margin:12px 0}
+
+/* Resume decision: condition first, limits second, forecast and caveats last. */
+.hawk-executor-resume-modal .ant-modal-confirm-title{font-size:18px;font-weight:600;line-height:1.5}
+.hawk-executor-resume-modal .ant-modal-confirm-content{margin-top:12px}
+.hawk-executor-resume-modal .hawk-executor-resume-status{font-size:13px;font-weight:400;color:#687384;margin:0 0 16px}
+.hawk-executor-resume-modal .hawk-executor-resume-notice dl{background:#f7f8fa;border-radius:6px;padding:12px 16px;margin:0 0 20px;gap:10px 20px;align-items:baseline}
+.hawk-executor-resume-modal .hawk-executor-resume-notice dt{font-size:12px;font-weight:400;color:#687384;line-height:1.6}
+.hawk-executor-resume-modal .hawk-executor-resume-notice dd{font-size:14px;font-weight:600;color:#202a38;line-height:1.5;font-variant-numeric:tabular-nums}
+.hawk-executor-resume-modal .hawk-executor-resume-notice dd.is-unset{font-size:13px;font-weight:400;color:#7b8492}
+.hawk-executor-resume-unlimited{margin:0 0 18px}
+.hawk-executor-resume-unlimited>strong{display:block;font-size:16px;font-weight:600;color:#202a38;line-height:1.5;margin-bottom:6px}
+.hawk-executor-resume-unlimited>p{font-size:14px;font-weight:400;color:#536071;line-height:1.8;margin:0}
+.hawk-executor-resume-unlimited b{font-weight:500;color:#202a38}
+.hawk-executor-resume-modal .ant-alert{background:#f7f8fa;border:0;padding:12px 14px;border-radius:6px}
+.hawk-executor-resume-modal .ant-alert-icon{font-size:16px;color:#7b8492;margin-inline-end:10px}
+.hawk-executor-resume-modal .ant-alert-message{font-size:13px;font-weight:500;color:#536071;line-height:1.6;margin-bottom:3px}
+.hawk-executor-resume-modal .ant-alert-description{font-size:12px;font-weight:400;color:#687384;line-height:1.7}
+.hawk-executor-resume-modal .hawk-executor-resume-footnote{font-size:12px;font-weight:400;line-height:1.7;color:#7b8492;margin:12px 0 0}
+.hawk-executor-resume-modal .ant-modal-confirm-btns{margin-top:20px}

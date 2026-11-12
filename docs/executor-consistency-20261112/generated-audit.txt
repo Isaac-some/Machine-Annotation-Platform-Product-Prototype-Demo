@@ -1,0 +1,5 @@
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 audit:public
+> node scripts/audit-public.mjs --output
+
+{"passed":true,"scope":"generated website","demoOnly":true}

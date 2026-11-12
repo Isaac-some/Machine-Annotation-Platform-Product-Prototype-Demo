@@ -1,3 +1,5 @@
+import { productionConfigurationKey } from './executor-production-observation';
+import { observationThreshold } from './executor-observation';
 import { observationCheckpoints } from './executor-observation';
 import type { LocalExecutor } from './local-workspace';
 
@@ -108,44 +110,28 @@ function rates(segments: TimeSegment[]) {
   return { rate, outputs, activeMs, slowRate: Math.min(rate, quantile(speeds, TIME_ESTIMATE_DEFAULTS.lowQuantile)), fastRate: Math.max(rate, quantile(speeds, TIME_ESTIMATE_DEFAULTS.highQuantile)) };
 }
 export function streamTimeEvidence(e: LocalExecutor): TimeEvidence {
-  const s = e.stream, observation = s?.timeObservation;
+  const s = e.stream;
   const unavailable = (reason: string): TimeEvidence => ({ ready: false, reason, method: 'overall', observedOutputs: 0, observedHours: 0, completeSegments: 0 });
-  if (!observation) return unavailable('缺少同一观测时间段的成品与有效处理时长记录，等待新观测');
-  if (observation.configKey !== timeConfigurationKey(e)) return unavailable('工作流或运行配置已变化，等待新配置样本');
-  if (observation.waitingThroughRoot !== undefined) return unavailable('配置已变更，等待旧配置在途任务及重试收尾后重新采样');
-  const segments = observation.segments.slice(-TIME_ESTIMATE_DEFAULTS.retainedSegments);
-  const partial = { activeMs: observation.current.activeMs - observation.checkpoint.activeMs, outputs: observation.current.outputs - observation.checkpoint.outputs };
-  if (segments.some(segment => !validSegment(segment)) || !Number.isFinite(partial.activeMs) || partial.activeMs < 0 || !Number.isSafeInteger(partial.outputs) || partial.outputs < 0 || partial.activeMs === 0 && partial.outputs > 0) return unavailable('部分观测缺少完整计时或成品记录');
-  const all = partial.activeMs > 0 ? [...segments, partial] : segments;
-  if (!all.length) return unavailable(observation.incompleteReason ?? '尚无有效处理时长记录');
-  const total = rates(all);
-  if (total.outputs === 0) return unavailable('当前观测尚无最终成品，暂无法估算完成所需时间');
-  const spread = rates(segments);
-  const evidence: TimeEvidence = {
-    ready: true, method: 'overall', source: observation.source, rate: total.rate,
-    updatedAt: observation.updatedAt,
-    observedOutputs: total.outputs, observedHours: total.activeMs / 3600000, completeSegments: segments.length,
-    slowRate: spread.slowRate === undefined ? undefined : Math.min(total.rate, spread.slowRate),
-    fastRate: spread.fastRate === undefined ? undefined : Math.max(total.rate, spread.fastRate),
-    note: '未使用资源特征；假设后续资源与近期观测相近。',
-  };
-  const profile = s?.resourceTimeEvidence;
-  if (!profile) return evidence;
-  const classes = profile.classes.filter(item => item.productShare > 0);
-  const usable = profile.configKey === timeConfigurationKey(e) && classes.length > 0 && profile.classes.every(item => Number.isFinite(item.productShare) && item.productShare >= 0) && classes.every(item => item.segments.length > 0 && item.segments.every(validSegment));
-  if (!usable) return { ...evidence, note: '资源特征或对应实测速度不完整，已退回整批运行观测。' };
-  const share = classes.reduce((sum, item) => sum + item.productShare, 0);
-  const groups = classes.map(item => ({ weight: item.productShare / share, segments: item.segments.slice(-TIME_ESTIMATE_DEFAULTS.retainedSegments), ...rates(item.segments.slice(-TIME_ESTIMATE_DEFAULTS.retainedSegments)) }));
-  if (groups.some(group => group.rate <= 0)) return { ...evidence, note: '部分资源类型尚无成品，已退回整批运行观测。' };
-  const weightedRate = (key: 'rate' | 'fastRate' | 'slowRate') => {
-    if (groups.some(group => group[key] === undefined)) return undefined;
-    if (groups.some(group => group[key] === 0)) return 0;
-    return 1 / groups.reduce((sum, group) => sum + group.weight / group[key]!, 0);
-  };
-  const observedOutputs = groups.reduce((sum, group) => sum + group.outputs, 0);
-  const observedHours = groups.reduce((sum, group) => sum + group.activeMs, 0) / 3600000;
-  return { ...evidence, method: 'resource', source: profile.source, rate: weightedRate('rate'), slowRate: weightedRate('slowRate'), fastRate: weightedRate('fastRate'), observedOutputs, observedHours, completeSegments: Math.min(...groups.map(group => group.segments.length)), note: `按目标成品构成加权：${classes.map(item => `${item.label} ${Math.round(item.productShare / share * 100)}%`).join('、')}。资源类型速度来自各自独立的整批观测，并非节点耗时相加。` };
+  const shared = s?.productionObservation;
+  if (!shared) return unavailable('等待同一批已处理完的数据及有效计时，成本与时间将同时更新');
+  if (shared.configKey !== productionConfigurationKey(e)) return unavailable('工作流配置已变化，等待新配置样本');
+  const threshold = observationThreshold(s?.source?.totalKnown === false ? 0 : s?.source?.initialInputCount ?? e.inputCount ?? 0);
+  const rows = shared.roots.map(root => shared.metrics[root]);
+  if (rows.some(row => !row || !Number.isFinite(row.costCents) || row.costCents < 0 || !Number.isSafeInteger(row.finalOutputs) || row.finalOutputs < 0)) return unavailable('部分输入缺少完整的成本或成品记录');
+  if (shared.roots.length < threshold) return unavailable(`同批样本不足（${shared.roots.length} / ${threshold} 条）`);
+  if (!Number.isFinite(shared.activeMs) || !shared.activeMs || shared.activeMs < 0) return unavailable('同批样本缺少完整有效计时，暂无法估算');
+  const outputs = rows.reduce((n, row) => n + row.finalOutputs, 0);
+  if (!outputs || rows.reduce((n,row) => n+row.costCents,0) <= 0) return unavailable('有效成本与最终成品样本不足');
+  const rate = outputs * 3600000 / shared.activeMs;
+  const segments = shared.segments.filter(validSegment), spread = rates(segments);
+  return { ready: true, method: 'overall', source: shared.source, rate,
+    slowRate: spread.slowRate === undefined ? undefined : Math.min(rate, spread.slowRate),
+    fastRate: spread.fastRate === undefined ? undefined : Math.max(rate, spread.fastRate),
+    observedOutputs: outputs, observedHours: shared.activeMs / 3600000,
+    completeSegments: segments.length, updatedAt: shared.updatedAt,
+    note: '费用、成品和有效处理时间来自同批已处理完的输入；并行处理只计一次。' };
 }
+
 export function streamForecastSupply(e: LocalExecutor): { status: 'exhausted' | 'waiting' | 'unverified'; remainingInputs: number; message: string } {
   const s = e.stream, remainingInputs = Math.max(0, (e.inputCount ?? 0) - (s?.admitted ?? 0));
   const queued = Boolean(s?.queues?.some(queue => queue.length) || s?.stageRecovery);

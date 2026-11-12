@@ -1,3 +1,4 @@
+import { productionConfigurationKey } from './executor-production-observation';
 import type { LocalWorkspace } from './local-workspace';
 import { executorSettings } from './executor-settings';
 import { DELIVERY_DEMO_FLOW_NAMES, withDeliveryExamples } from './delivery-examples';
@@ -89,6 +90,7 @@ export function withPhase2Examples(w: LocalWorkspace): LocalWorkspace {
     const boundary = { activeMs: s.activeRunMs, outputs: 1000, settledInputs: 1000 };
     const minutes = [80, 120, 90, 110, 100, 80, 120, 90, 110, 100];
     s.timeObservation = { configKey, source: 'synthetic-demo', updatedAt: Date.now(), checkpoint: boundary, current: { ...boundary }, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 60000 })) };
+    s.productionObservation = { version: 1, configKey: productionConfigurationKey(executor), source: 'synthetic-demo', roots: [...s.settledRootIds], metrics: structuredClone(s.inputMetrics), activeMs: s.activeRunMs, updatedAt: Date.now(), segments: minutes.map(value => ({ outputs: 100, activeMs: value * 60000 })) };
     if (id === 'phase2-time-features') s.resourceTimeEvidence = { configKey, source: 'synthetic-demo', classes: [
       { label: '短视频（≤1分钟）', productShare: .5, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 30000 })) },
       { label: '长视频（1至5分钟）', productShare: .5, segments: minutes.map(value => ({ outputs: 100, activeMs: value * 120000 })) },

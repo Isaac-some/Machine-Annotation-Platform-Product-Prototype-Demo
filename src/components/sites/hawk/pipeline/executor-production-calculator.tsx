@@ -16,7 +16,7 @@ const sliderMarks = (max: number) => Object.fromEntries([0, max / 2, max].map(va
 function TimeResult({ label, value, reason }: { label: string; value?: { base: number; low?: number; high?: number }; reason?: string }) {
   return <div className="hawk-calculator-time-result"><span>{label}</span><strong>{value ? duration(value.base) : '暂无法估算'}</strong>{value && <small>{value.low === undefined ? '粗估：观测段不足，暂不能确定预留范围。' : value.high === undefined ? `按近期波动至少 ${duration(value.low)}；存在零产出时段，暂不能确定时间上界。` : `按近期波动估算的参考范围：${duration(value.low)} – ${duration(value.high)}`}</small>}{!value && <small>{reason}</small>}</div>;
 }
-export function ExecutorProductionCalculator({ executor: e, onClose }: { executor: LocalExecutor; onClose: () => void }) {
+export function ExecutorProductionCalculator({ executor: e, onClose, onConfigure }: { executor: LocalExecutor; onClose: () => void; onConfigure: (summary: string) => void }) {
   const [mode, setMode] = useState<'capacity' | 'target'>('capacity');
   const [constraint, setConstraint] = useState<'budget' | 'time' | 'both'>('budget');
   const [spend, setSpend] = useState<number | null>(2000), [target, setTarget] = useState<number | null>(2100), [hours, setHours] = useState<number | null>(8);
@@ -29,8 +29,6 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
   const timeEvidence = timeAddition.current.evidence;
   const combinedCost = showExtra ? estimateStreamPlan(e, { products: (target ?? NaN) + (extra ?? NaN) }) : undefined;
   const supply = streamForecastSupply(e);
-  const showCostEvidence = mode === 'target' || constraint !== 'time';
-  const showTimeEvidence = mode === 'target' || constraint !== 'budget';
   const timeFactor = timeUnit === 'days' ? 24 : timeUnit === 'minutes' ? 1 / 60 : 1;
   const displayedTime = hours === null ? null : Number((hours / timeFactor).toFixed(4));
   const timeMax = Math.max(timeUnit === 'days' ? 7 : timeUnit === 'minutes' ? 1440 : 24, displayedTime ?? 0);
@@ -41,11 +39,10 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
   const invalid = mode === 'target' ? target === null || !Number.isSafeInteger(target) || target < 0 || target > 100000 : (constraint !== 'time' && (spend === null || !Number.isFinite(spend) || spend < 0 || spend > 100000)) || (constraint !== 'budget' && (hours === null || !Number.isFinite(hours) || hours <= 0 || hours > 720));
   const timeBasis = timePlan.evidence?.ready ? `按观测吞吐 ${timePlan.rate!.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 份/小时测算（时间样本 ${timePlan.observedOutputs} 份 / ${observedDuration(timePlan.observedHours!)}）` : timePlan.reason;
   const costBasis = plan.reason ?? (plan.products ? `成本基准产能 ${plan.products.base.toLocaleString()} 份` : plan.cost ? `基准新增投入 ${money(plan.cost.base)}` : evidence.reason);
-  return <Modal className="hawk-cost-calculator" title="成本与时间计算器" open centered width={840} onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
+  return <Modal className="hawk-cost-calculator" title="成本与时间计算器" open centered width={840} onCancel={onClose} footer={<Space><Button onClick={onClose}>关闭</Button><Button type="primary" onClick={() => onConfigure(mode === 'target' ? `目标新增 ${target ?? '—'} 份${showExtra ? `，额外追加 ${extra ?? '—'} 份` : ''}；${costBasis}。仅供参考，请自行填写累计上限。` : `计划追加 ${constraint !== 'time' ? `${spend ?? '—'} 元` : ''}${constraint !== 'budget' ? `，有效处理 ${displayedTime ?? '—'} ${timeUnit === 'minutes' ? '分钟' : timeUnit === 'hours' ? '小时' : '天'}` : ''}。仅供参考，请自行填写累计上限。`)}>去配置</Button></Space>}>
     <div className="hawk-calculator-content">
-    <div className="hawk-calculator-evidence-group">
-      {showCostEvidence && <div className="hawk-calculator-evidence" aria-label="成本观测依据"><strong>成本观测</strong><span>成本样本 {evidence.samples.toLocaleString()} 条输入</span><span>样本成品 {evidence.outputs.toLocaleString()} 份</span><span>样本费用 {money(evidence.costCents)}</span><Tag>{evidence.ready ? evidence.rangeReason ? '基准可用 · 范围未确定' : '可用于成本试算' : '等待成本样本'}</Tag>{!evidence.ready && <small>{evidence.reason}</small>}{evidence.rangeReason && <small>{evidence.rangeReason}</small>}</div>}
-      {showTimeEvidence && <div className="hawk-calculator-evidence" aria-label="时间观测依据"><strong>时间观测</strong>{timeEvidence.ready ? <><span>已观测成品 {timeEvidence.observedOutputs} 份</span><span>有效处理 {observedDuration(timeEvidence.observedHours)}</span><Tag>{timeEvidence.completeSegments < TIME_ESTIMATE_DEFAULTS.minimumSegments ? '粗估' : '经验范围 · 未校准'}</Tag></> : <span>{timeEvidence.reason}</span>}</div>}
+    <div className="hawk-calculator-evidence-group" aria-label="同批生产观测">
+      <div className="hawk-calculator-evidence"><strong>同批已处理完的数据</strong><span>{evidence.samples.toLocaleString()} 条输入 → {evidence.outputs.toLocaleString()} 份成品</span><span>费用 {money(evidence.costCents)} · 有效处理 {timeEvidence.ready ? observedDuration(timeEvidence.observedHours) : '待确认'}</span><Tag>{evidence.ready && timeEvidence.ready ? '可用于成本与时间试算' : '等待共同观测'}</Tag>{(!evidence.ready || !timeEvidence.ready) && <small>{evidence.reason ?? timeEvidence.reason}</small>}</div>
     </div>
     <Segmented block aria-label="预测方向" value={mode} onChange={value => setMode(value as typeof mode)} options={[{ value: 'capacity', label: '预算 / 时长 → 产量' }, { value: 'target', label: '目标产量 → 成本 / 时间' }]} />
     {mode === 'capacity' && <Segmented block aria-label="产量约束" value={constraint} onChange={value => setConstraint(value as typeof constraint)} options={[{ value: 'budget', label: '按预算' }, { value: 'time', label: '按时长' }, { value: 'both', label: '预算 + 时长' }]} />}
@@ -83,7 +80,7 @@ export function ExecutorProductionCalculator({ executor: e, onClose }: { executo
       {showExtra && combinedCost?.cost && <small>追加后累计预计新增投入：{costResult(combinedCost.cost)}，不含已发生费用。</small>}
       {(showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning) && <small>{showExtra ? timeAddition.combined.supplyWarning : timeAddition.current.supplyWarning}</small>}
     </section>}
-    <details className="hawk-calculator-coverage"><summary>估算依据</summary><p>按同一批已收尾输入的实际费用与最终成品计算，包含失败、重试和多产物。首次按输入量 5%（最多 1,000 条），此后按 2%（最多 400 条）刷新；未知总量按 500 / 200 条。时间按有效处理速度估算，排除暂停和等待。</p><p>基准计入全部样本费用与成品，失败及零产出输入也计入。波动范围只比较完整分组；完整分组零产出时保留基准并说明范围未确定。首次样本不足、整批零成品或配置变化时不提供无依据的预测。试算不改变运行配置。</p></details>
+    <details className="hawk-calculator-coverage"><summary>估算依据与公式</summary><p>每份成品成本＝本批已处理完的费用÷对应最终成品数；产出速度＝对应最终成品数÷本批有效处理时间。预计成品＝追加预算÷每份成本，或计划有效时长×产出速度；同时约束取较低值。</p><p>按同一批已收尾输入的实际费用与最终成品计算，包含失败、重试和多产物。首次按输入量 5%（最多 1,000 条），此后按 2%（最多 400 条）刷新；未知总量按 500 / 200 条。成本与时间同时刷新；在途费用先计入实际累计，处理完后再纳入估算。有效处理时间排除暂停、排队和无数据等待，并行处理只计一次。</p><p>基准计入全部样本费用与成品，失败及零产出输入也计入。波动范围只比较完整分组；完整分组零产出时保留基准并说明范围未确定。首次样本不足、整批零成品或配置变化时不提供无依据的预测。试算不改变运行配置。</p></details>
     <p className="hawk-calculator-time-help">原型模拟估算，仅供参考。</p>
     </div>
   </Modal>;

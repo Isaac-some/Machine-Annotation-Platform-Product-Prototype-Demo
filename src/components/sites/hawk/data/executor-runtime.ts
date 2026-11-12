@@ -1,3 +1,4 @@
+import { endStream } from './executor-streaming';
 import { validateDemoCount } from './executor-observation';
 import { startStream, tickStream, validateStreamPolicy, setStreamLimits, resumeStream, streamRunBlockReason, type StreamPolicy } from './executor-streaming';
 import { advanceBatchFinish, appendCompletedResults, beginBatchFinish, exportMembers } from './delivery';
@@ -81,9 +82,9 @@ export function configureExecutor(workspace: LocalWorkspace, id: string, input: 
     const before = original.streamPolicy!, after = input.streamPolicy;
     if (!after) throw new Error('请填写运行限制');
     for (const key of Object.keys({ ...before, ...after }) as (keyof StreamPolicy)[]) {
-      if (!['costLimitCents', 'inputLimit', 'runtimeLimitMs', 'idleTimeoutMs', 'costLimitAction'].includes(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) throw new Error('执行已开始，只能修改运行限制');
+      if (!['costLimitCents', 'inputLimit', 'runtimeLimitMs', 'idleTimeoutMs', 'costLimitAction', 'targetOutputCount', 'targetOutputPercent', 'targetOutputMode', 'legacyTargetUnresolved'].includes(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) throw new Error('执行已开始，只能修改运行限制');
     }
-    return setStreamLimits(workspace, id, { costLimitCents: after.costLimitCents, inputLimit: after.inputLimit, runtimeLimitMs: after.runtimeLimitMs, idleTimeoutMs: after.idleTimeoutMs });
+    return setStreamLimits(workspace, id, { costLimitCents: after.costLimitCents, inputLimit: after.inputLimit, runtimeLimitMs: after.runtimeLimitMs, idleTimeoutMs: after.idleTimeoutMs, targetOutputCount: after.targetOutputCount });
   }
   if (original.runtime.state === 'running') throw new Error('请先暂停，再调整输入及执行器配置');
   validateExecutorSettings(input.settings);
@@ -108,9 +109,10 @@ export function canExecutorAction(workspace: LocalWorkspace, executor: LocalExec
   if (!runtime) return false;
   const batches = executorBatches(workspace, executor);
   if (executor.runMode === 'stream') {
+    if (action === 'end') return ['paused', 'waiting'].includes(runtime.state) && executor.stream?.phase !== 'draining' && !executor.stream?.stageRecovery && !executor.stream?.endedIntake;
     if (action === 'start') return runtime.state === 'ready' && Boolean(executor.input && executor.streamPolicy) && !batches.some(hasBlockingBatchIssues);
     if (action === 'pause') return runtime.state === 'running' && executor.stream?.phase !== 'draining';
-    if (action === 'resume') return ['paused', 'waiting'].includes(runtime.state) && executor.stream?.phase !== 'draining' && executor.stream?.phase !== 'completed' && !streamRunBlockReason(executor);
+    if (action === 'resume') return ['paused', 'waiting'].includes(runtime.state) && executor.stream?.phase !== 'draining' && executor.stream?.phase !== 'completed' && !streamRunBlockReason(executor, workspace);
     return false;
   }
   const batch = batches[runtime.currentIndex];
@@ -126,6 +128,7 @@ export function canExecutorAction(workspace: LocalWorkspace, executor: LocalExec
 export function changeExecutorState(workspace: LocalWorkspace, id: string, action: ExecutorAction): LocalWorkspace {
   const original = workspace.executors.find(item => item.id === id);
   if (!original || !canExecutorAction(workspace, original, action)) throw new Error(action === 'start' ? '请先配置有效的本次输入' : '当前执行状态不支持此操作');
+  if (original.runMode === 'stream' && action === 'end') return endStream(workspace, id);
   if (original.runMode === 'stream' && action === 'start') return startStream(workspace, id);
   if (original.runMode === 'stream' && action === 'resume') return resumeStream(workspace, id);
   const next = copy(workspace);

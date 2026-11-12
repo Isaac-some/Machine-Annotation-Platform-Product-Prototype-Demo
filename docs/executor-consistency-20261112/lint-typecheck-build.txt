@@ -1,0 +1,69 @@
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 check
+> npm run lint && npm run typecheck && npm run build
+
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 lint
+> eslint
+
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 typecheck
+> tsc --noEmit
+
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 build
+> npm run build:editor && next build
+
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 build:editor
+> node scripts/build-editor.mjs
+
+
+> agent-workflow-builder@0.1.0 build:pages
+> vite build --config vite.pages.config.ts
+
+vite v8.0.13 building client environment for production...
+[2K
+transforming...✓ 2226 modules transformed.
+rendering chunks...
+computing gzip size...
+pages-dist/index.html                     0.52 kB │ gzip:   0.34 kB
+pages-dist/assets/index-C3SNf5pg.css    130.75 kB │ gzip:  25.05 kB
+pages-dist/assets/index-DUQrehCC.js   1,041.13 kB │ gzip: 315.75 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.01s
+▲ Next.js 16.3.5 (Turbopack)
+✓ Running next.config.ts took 98ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.6s
+  Running TypeScript ...
+  Finished TypeScript in 3.6s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/12) ...
+  Generating static pages using 7 workers (3/12)
+  Generating static pages using 7 workers (6/12)
+  Generating static pages using 7 workers (9/12)
+✓ Generating static pages using 7 workers (12/12) in 1051ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /hawk/pipeline
+├ ○ /hawk/pipeline/editor
+├ ○ /hawk/pipeline/executor
+├ ○ /hawk/project
+├ ○ /hawk/project/batch
+├ ○ /hawk/project/detail
+├ ○ /hawk/stage-map
+├ ○ /hawk/stage-map/flows
+└ ○ /icon.svg
+
+
+○  (Static)  prerendered as static content

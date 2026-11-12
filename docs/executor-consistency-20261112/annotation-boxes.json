@@ -1,0 +1,64 @@
+{
+  "01-overview": [
+    {
+      "n": 1,
+      "box": {
+        "x": 164,
+        "y": 91,
+        "width": 129,
+        "height": 32
+      }
+    }
+  ],
+  "02-configuration": [
+    {
+      "n": 2,
+      "box": {
+        "x": 325,
+        "y": 377,
+        "width": 387,
+        "height": 36
+      }
+    },
+    {
+      "n": 3,
+      "box": {
+        "x": 728,
+        "y": 377,
+        "width": 387,
+        "height": 36
+      }
+    }
+  ],
+  "04-shared-calculator": [
+    {
+      "n": 4,
+      "box": {
+        "x": 324,
+        "y": 104,
+        "width": 768,
+        "height": 82
+      }
+    },
+    {
+      "n": 5,
+      "box": {
+        "x": 1046,
+        "y": 902,
+        "width": 74,
+        "height": 32
+      }
+    }
+  ],
+  "12-limit-paused": [
+    {
+      "n": 6,
+      "box": {
+        "x": 29,
+        "y": 847,
+        "width": 266,
+        "height": 40
+      }
+    }
+  ]
+}

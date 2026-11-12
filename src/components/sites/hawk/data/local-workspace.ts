@@ -1,3 +1,4 @@
+import { normalizeExecutorTarget } from './executor-target';
 import { PIPELINE_GROUPS, type PipelineDraft, type PipelineGroup } from './mock-pipelines';
 import { useSyncExternalStore } from 'react';
 import { PROJECTS, type ProjectRow } from './mock-projects';
@@ -46,6 +47,7 @@ const RESULT_STORE = 'batch-results';
 const initialWorkspace = (): LocalWorkspace => ({ groups: PIPELINE_GROUPS, executors: [], projects: PROJECTS, batches: BATCHES });
 function decodeWorkspace(raw: string): LocalWorkspace {
   const parsed = JSON.parse(raw) as Partial<LocalWorkspace> | null;
+  parsed?.executors?.forEach(normalizeExecutorTarget);
   return normalizeProjectAssociations(parsed && Array.isArray(parsed.groups) && Array.isArray(parsed.executors) ? { ...initialWorkspace(), ...parsed } : initialWorkspace());
 }
 const serverSnapshot = initialWorkspace();

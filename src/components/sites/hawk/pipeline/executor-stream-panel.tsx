@@ -36,7 +36,7 @@ export function ExecutorCloneButton({ executor }: { executor: LocalExecutor }) {
   </Modal></>;
 }
 
-export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }) {
+export function ExecutorStreamPanel({ executor: e, onConfigure }: { executor: LocalExecutor; onConfigure: (summary: string) => void }) {
   const query = useSearchParams();
   const [open, setOpen] = useState(['details', 'calculator'].includes(query.get('panel') ?? '')), [calculatorOpen, setCalculatorOpen] = useState(query.get('panel') === 'calculator'), [msg, holder] = message.useMessage();
   const act = (fn: (w: ReturnType<typeof readWorkspace>, id: string) => ReturnType<typeof readWorkspace>) => { try { writeWorkspace(fn(readWorkspace(), e.id)); } catch (issue) { msg.error(issue instanceof Error ? issue.message : '操作失败'); } };
@@ -83,7 +83,7 @@ export function ExecutorStreamPanel({ executor: e }: { executor: LocalExecutor }
         ]} />
       </section>
     </Modal>
-    {calculatorOpen && s && <ExecutorProductionCalculator executor={e} onClose={() => setCalculatorOpen(false)} />}
+    {calculatorOpen && s && <ExecutorProductionCalculator executor={e} onClose={() => setCalculatorOpen(false)} onConfigure={summary => { setCalculatorOpen(false); setOpen(false); onConfigure(summary); }} />}
 
   </>;
 }

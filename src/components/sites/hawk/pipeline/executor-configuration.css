@@ -57,3 +57,8 @@
 .hawk-executor-configuration .hawk-target-output-mode{display:flex;width:max-content;max-width:100%;margin-bottom:8px}
 .hawk-executor-configuration .hawk-target-output-mode .ant-radio-button-wrapper{height:32px;padding-inline:14px;line-height:30px}
 .hawk-executor-configuration .hawk-target-output-help{margin-top:6px}
+
+.hawk-config-locked-summary,.hawk-config-existing-settings>summary{cursor:pointer;font-size:13px;line-height:22px;color:#526176;font-weight:500}
+.hawk-config-locked-summary+.hawk-executor-settings-fields{margin-top:14px}
+.hawk-config-existing-settings{border-top:1px solid #e5eaf1;padding-top:16px}
+.hawk-executor-configuration .hawk-settings-section:has(>.hawk-config-locked-summary){padding:12px 0}

@@ -1,0 +1,7 @@
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 lint
+> eslint
+
+
+> machine-annotation-platform-product-prototype-demo@1.0.0 typecheck
+> tsc --noEmit

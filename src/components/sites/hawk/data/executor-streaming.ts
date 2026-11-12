@@ -1,10 +1,13 @@
+import { prepareProductionObservation, freezeProductionObservation, productionConfigurationKey, type ProductionObservation } from './executor-production-observation';
 import { observationCheckpoints, observationStep as percentStep, validateDemoCount } from './executor-observation';
 import type { LocalExecutor, LocalWorkspace } from './local-workspace';
 import { cloneWorkspace } from './delivery';
+import { hasBlockingBatchIssues } from './batch-common';
 import type { RunTimeTrace } from './executor-run-time';
 import { prepareTimeObservation, recordTimeObservation, type TimeObservation, type ResourceTimeEvidence } from './executor-time-estimates';
 
 export type StreamPolicy = {
+  legacyTargetUnresolved?: boolean;
   targetOutputMode?: 'count' | 'percent';
   costLimitCents?: number;
   costLimitAction?: 'drain' | 'continue';
@@ -24,6 +27,14 @@ export type StreamPolicy = {
 export type StreamToken = { key: string; root: number; stage: number; attempt: number };
 export type StreamStage = { processed: number; failed: number; outputs: number; costCents: number };
 export type StreamRun = {
+  productionObservation?: ProductionObservation;
+  productionSampling?: { configKey: string; afterRoot: number; lastStep: number };
+  incompleteTimingRoots?: Record<number, boolean>;
+  processingIntervals?: Record<number, [number, number][]>;
+  /** New measured sampling clock; never substitutes for a missing historical cumulative clock. */
+  observationRunMs?: number;
+  endedIntake?: boolean;
+  clearedLimits?: string[];
   demoPlayback?: { scenario: string; awaitingStart: boolean };
   timeObservation?: TimeObservation;
   resourceTimeEvidence?: ResourceTimeEvidence;
@@ -66,6 +77,7 @@ const costPrompt = (s: StreamRun, text: string, level: number) => { const id = `
 const event = (s: StreamRun, text: string) => { s.events.unshift({ at: Date.now(), text }); s.events = s.events.slice(0, 100); };
 export function validateStreamPolicy(policy: StreamPolicy, count: number) {
   validateDemoCount(count);
+  if (policy.legacyTargetUnresolved) throw new Error('旧成品目标缺少原始输入基准，请重新确认数量目标');
   if (policy.costLimitCents !== undefined && (!Number.isSafeInteger(policy.costLimitCents) || policy.costLimitCents <= 0)) throw new Error('总成本上限须为大于 0 的金额，或留空');
   if (policy.costLimitAction !== undefined && !['drain', 'continue'].includes(policy.costLimitAction)) throw new Error('请选择触碰成本上限后的处理方式');
   for (const [key, label] of [['idleTimeoutMs', '无输入源活动等待时长'], ['inputLimit', '输入条数上限'], ['runtimeLimitMs', '运行时长上限'], ['targetOutputCount', '目标成品量']] as const) {
@@ -82,7 +94,7 @@ export function newStreamRun(stages: number, costLimitCents?: number): StreamRun
   return { activeRunMs: 0, stageActiveMs: Array(stages).fill(0), phase: 'production', control: 'automatic', admitted: 0, settledInputs: 0, queues: Array.from({ length: stages }, () => []), failures: [], stages: Array.from({ length: stages }, () => ({ processed: 0, failed: 0, outputs: 0, costCents: 0 })), costCents: 0, inputMetrics: {}, settledRootIds: [], costLimitCents, reminded: false, retryRound: 0, recoveryRuns: 0, events: [] };
 }
 export function estimateConfigurationKey(e: LocalExecutor) {
-  return JSON.stringify(e.flows ?? []);
+  return productionConfigurationKey(e);
 }
 export function startStream(w: LocalWorkspace, id: string): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!;
@@ -92,26 +104,29 @@ export function startStream(w: LocalWorkspace, id: string): LocalWorkspace {
   e.stream = newStreamRun(e.runtime.batchIds.length, e.streamPolicy.costLimitCents); if (id === 'phase2-zero') e.stream.demoOutcome = 'zero'; e.stream.clockBoundaryAt = Date.now(); e.runtime.started = true; e.runtime.state = 'running';
   e.stream.source = { lastActivityAt: Date.now(), closed: false, waiting: false, initialInputCount: e.inputCount!, totalKnown: !/\.csv(?:$|[?#])/i.test(e.input ?? ''), readingTicks: 0, rowKeyValid: !/missing-rowkey/i.test(e.input ?? '') };
   e.streamPolicy.costLimitAction = 'drain';
-  prepareTimeObservation(e);
+  prepareTimeObservation(e); prepareProductionObservation(e);
   event(e.stream, '开始连续生产；成本上限为可选项，预测将随演示观测数据更新');
   sync(next, e); return next;
 }
-export type StreamLimits = Pick<StreamPolicy, 'costLimitCents' | 'inputLimit' | 'runtimeLimitMs' | 'idleTimeoutMs'>;
+export type StreamLimits = Pick<StreamPolicy, 'costLimitCents' | 'inputLimit' | 'runtimeLimitMs' | 'idleTimeoutMs' | 'targetOutputCount'>;
 export function setStreamCostLimit(w: LocalWorkspace, id: string, cents?: number): LocalWorkspace {
   const e = w.executors.find(x => x.id === id);
   return setStreamLimits(w, id, { ...e?.streamPolicy, costLimitCents: cents });
 }
 export function setStreamLimits(w: LocalWorkspace, id: string, limits: StreamLimits): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e?.stream;
-  if (!s || !e.streamPolicy || s.phase === 'completed') throw new Error('当前状态不能调整运行限制');
-  const policy = { ...e.streamPolicy, ...limits, costLimitCents: limits.costLimitCents, inputLimit: limits.inputLimit, runtimeLimitMs: limits.runtimeLimitMs, costLimitAction: 'drain' as const };
+  if (!s || !e.streamPolicy || s.phase === 'completed' || s.endedIntake) throw new Error('当前状态不能调整运行限制');
+  const previousBlocks = streamLimitBlocks(e);
+  const policy = { ...e.streamPolicy, ...limits, targetOutputPercent: undefined, targetOutputMode: 'count' as const, legacyTargetUnresolved: undefined, costLimitCents: limits.costLimitCents, inputLimit: limits.inputLimit, runtimeLimitMs: limits.runtimeLimitMs, costLimitAction: 'drain' as const };
   validateStreamPolicy(policy, e.inputCount!);
   // Unchanged limits may already be reached; editing another field must remain possible.
   if (limits.costLimitCents !== e.streamPolicy.costLimitCents && limits.costLimitCents !== undefined && limits.costLimitCents <= s.costCents) throw new Error('成本上限须高于当前累计费用，或留空取消');
   if (limits.inputLimit !== e.streamPolicy.inputLimit && limits.inputLimit !== undefined && limits.inputLimit <= s.admitted) throw new Error('输入条数上限须高于已取入条数，或留空取消');
   if (limits.runtimeLimitMs !== e.streamPolicy.runtimeLimitMs && limits.runtimeLimitMs !== undefined && (s.activeRunMs === undefined || limits.runtimeLimitMs <= s.activeRunMs)) throw new Error('运行时长上限须高于已累计运行时长，且计时记录完整；或留空取消');
+  if (limits.targetOutputCount !== e.streamPolicy.targetOutputCount && limits.targetOutputCount !== undefined && limits.targetOutputCount <= (s.stages.at(-1)?.outputs ?? 0)) throw new Error('成品目标须高于当前累计成品数，或留空取消');
   if (s.costLimitCents !== policy.costLimitCents) { s.triggerCostCents = undefined; s.drainFinalCents = undefined; s.reminded = false; }
   e.streamPolicy = policy; s.costLimitCents = policy.costLimitCents;
+  s.clearedLimits = [...new Set([...(s.clearedLimits ?? []), ...previousBlocks.filter(x => !streamLimitBlocks(e).includes(x))])];
   // Do not clear a latched stop or restart intake when saving configuration.
   event(s, '运行限制已保存；已停止取数时仍须在主界面手动继续');
   return next;
@@ -138,18 +153,40 @@ export function recordStreamSourceEvent(w: LocalWorkspace, id: string, signal: S
   event(s, signal.kind === 'data' ? `输入源新增 ${signal.count} 条可用数据` : signal.kind === 'error' ? s.reason! : `输入源事件：${({ message: '消息', heartbeat: '心跳', progress: '传输进度', end: '明确供数结束', recovered: '检查恢复成功' })[signal.kind]}`);
   sync(next, e); return next;
 }
-export function streamRunBlockReason(e: LocalExecutor): string | undefined {
+export function streamRunBlockReason(e: LocalExecutor, workspace?: LocalWorkspace): string | undefined {
   const s = e.stream, p = e.streamPolicy;
   if (!s || !p) return '执行器尚未启动';
+  if (p.legacyTargetUnresolved) return '旧成品目标缺少原始输入基准，请重新确认数量目标';
+  if (s.endedIntake || e.runtime?.state === 'ended') return '执行器已结束，不再从源头取数';
+  if (workspace && batchesFor(workspace, e).some(hasBlockingBatchIssues)) return '关联批次仍有阻断故障，请先处理并重新检查';
+  const blocks = streamLimitBlocks(e);
+  if (blocks.length) return `请先在“输入及执行器配置”中提高或取消已达到的限制：${blocks.join('、')}`;
   const reason = runLimitReason(e);
   if (reason) return `请先在“输入及执行器配置”中提高或取消已达到的${({ cost: '成本上限', input: '输入条数上限', time: '运行时长上限', target: '目标成品量' })[reason]}`;
   if (s.source?.error) return `输入源检查失败：${s.source.error}；请先恢复输入源`;
 }
+export function streamLimitBlocks(e: LocalExecutor): string[] {
+  const s = e.stream, p = e.streamPolicy; if (!s || !p) return [];
+  return [p.costLimitCents !== undefined && s.costCents >= p.costLimitCents ? '成本上限' : undefined,
+    p.inputLimit !== undefined && s.admitted >= p.inputLimit ? '取入上限' : undefined,
+    p.runtimeLimitMs !== undefined && (s.activeRunMs === undefined || s.activeRunMs >= p.runtimeLimitMs) ? '时长上限' : undefined,
+    p.targetOutputCount !== undefined && (s.stages.at(-1)?.outputs ?? 0) >= p.targetOutputCount ? '成品目标' : undefined].filter((x): x is string => Boolean(x));
+}
+export function endStream(w: LocalWorkspace, id: string): LocalWorkspace {
+  const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id), s = e?.stream;
+  if (!e?.runtime || !s || !['paused', 'waiting'].includes(e.runtime.state) || s.phase === 'draining' || s.stageRecovery || s.endedIntake) throw new Error('请先暂停并等待当前操作完成，再结束执行器');
+  s.endedIntake = true; s.phase = queued(s) ? 'draining' : 'completed'; s.manualAdmission = false;
+  s.clockBoundaryAt = Date.now();
+  if (s.source) s.source.closed = true;
+  e.runtime.state = 'ended'; s.reason = '执行器已结束，不再从源头取数；已有批次继续处理，导出由批次负责。';
+  event(s, s.reason); sync(next, e); return next;
+}
 export function resumeStream(w: LocalWorkspace, id: string, now = Date.now()): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e?.stream;
   if (!s || !e.runtime || !(['paused', 'waiting'].includes(e.runtime.state)) || s.phase === 'completed' || s.phase === 'draining') throw new Error('请等待收尾完成，再继续运行');
-  const blocked = streamRunBlockReason(e); if (blocked) throw new Error(blocked);
+  const blocked = streamRunBlockReason(e, next); if (blocked) throw new Error(blocked);
   s.stopReason = undefined; s.control = 'automatic'; s.phase = 'production'; s.manualAdmission = true;
+  s.clearedLimits = [];
   s.triggerCostCents = undefined; s.drainFinalCents = undefined;
   if (s.source) { s.source.lastActivityAt = now; s.source.waiting = false; }
   s.clockBoundaryAt = now; s.reason = '已人工继续生产，累计费用、取入量和处理时长保留';
@@ -208,7 +245,7 @@ export function takeOverStream(w: LocalWorkspace, id: string): LocalWorkspace {
 export function prepareStreamRecovery(w: LocalWorkspace, id: string): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!; const s = e?.stream;
   if (!s || s.control !== 'manual' || s.phase !== 'review' || s.preparation !== undefined || !s.failures.length) throw new Error('请先人工接管，等待收尾后选择失败数据补救');
-  const blocked = streamRunBlockReason(e); if (blocked) throw new Error(blocked);
+  const blocked = streamRunBlockReason(e, next); if (blocked) throw new Error(blocked);
   s.preparation = 0; s.reason = '正在扫描并准备失败输入；rowkey 标记不能替代完整输入'; e.runtime!.state = 'running'; event(s, '人工确认本次失败类补救，可能产生额外费用'); return next;
 }
 export function retryStreamStage(w: LocalWorkspace, id: string, stageIndex: number): LocalWorkspace {
@@ -219,7 +256,7 @@ export function retryStreamStage(w: LocalWorkspace, id: string, stageIndex: numb
   if (!failed.length) throw new Error('该环节没有失败数据');
   if (e.runtime?.state !== 'paused' && !['review', 'completed'].includes(s.phase)) throw new Error('请先暂停执行器，再重试该批次失败数据');
   if (s.phase === 'draining') throw new Error('请等待已取入数据收尾完成，再重试');
-  const blocked = streamRunBlockReason(e); if (blocked) throw new Error(blocked);
+  const blocked = streamRunBlockReason(e, next); if (blocked) throw new Error(blocked);
   s.stageRecovery = { stage: stageIndex, preparation: 0, queues: s.queues, phase: s.phase, control: s.control, manualAdmission: s.manualAdmission, pausedStages: s.pausedStages, returnPaused: e.runtime?.state === 'paused' };
   s.queues = s.queues.map(() => []);
   failed.forEach(token => s.queues[stageIndex].push({ ...token, attempt: token.attempt + 1 }));
@@ -251,11 +288,13 @@ function sync(w: LocalWorkspace, e: LocalExecutor) {
 /** Synthetic local costs/outcomes only. Every admitted input runs without a sample gate. */
 export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs = 0, observedAt?: number): LocalWorkspace {
   const original = w.executors.find(x => x.id === id);
-  if (!original?.stream || original.stream.demoPlayback?.awaitingStart || original.runtime?.state !== 'running') return w;
+  if (!original?.stream || original.stream.demoPlayback?.awaitingStart || original.runtime?.state !== 'running' && !(original.stream.endedIntake && original.stream.phase === 'draining')) return w;
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e.stream!, p = e.streamPolicy!, bs = batchesFor(next, e);
   const now = observedAt ?? Date.now();
   s.inputMetrics ??= {}; s.settledRootIds ??= [];
-  prepareTimeObservation(e);
+  prepareTimeObservation(e); prepareProductionObservation(e);
+  const processingStartMs = s.observationRunMs ?? s.activeRunMs ?? 0;
+  s.observationRunMs = processingStartMs;
   const configKey = estimateConfigurationKey(e);
   if (s.estimateConfigKey !== configKey) {
     s.estimateConfigKey = configKey;
@@ -297,11 +336,15 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
     sync(next, e); return next;
   }
   const runnable = runnableStages(s);
+  let processingSpans: number[] = Array(s.stages.length).fill(0);
   // The driver supplies measured, uninterrupted intervals. Queued/paused stages never accrue time.
-  if (s.activeRunMs !== undefined && Number.isFinite(observedProcessingMs) && observedProcessingMs > 0) {
+  if (Number.isFinite(observedProcessingMs) && observedProcessingMs > 0) {
     const measured = observedAt === undefined ? observedProcessingMs : Math.max(0, Math.min(observedProcessingMs, observedAt - (s.clockBoundaryAt ?? -Infinity)));
     const spans = runnable.map((active, i) => active ? (observedAt === undefined ? measured : Math.max(0, Math.min(measured, observedAt - (s.stageClockBoundaryAt?.[i] ?? -Infinity)))) : 0);
-    s.activeRunMs += Math.max(0, ...spans);
+    processingSpans = spans;
+    const activeMs = Math.max(0, ...spans);
+    s.observationRunMs += activeMs;
+    if (s.activeRunMs !== undefined) s.activeRunMs += activeMs;
     s.stageActiveMs ??= Array(s.stages.length).fill(0);
     spans.forEach((span, i) => { s.stageActiveMs![i] += span; });
   }
@@ -314,6 +357,9 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
   for (let i = s.queues.length - 1; i >= 0; i--) {
     if (s.pausedStages?.includes(i) || i + 1 < s.queues.length && s.pausedStages?.includes(i + 1) && s.queues[i + 1].length > 0) continue;
     const token = s.queues[i].shift(); if (!token) continue;
+    if (processingSpans[i] > 0) {
+      s.processingIntervals ??= {}; (s.processingIntervals[token.root] ??= []).push([s.observationRunMs - processingSpans[i], s.observationRunMs]);
+    } else { s.incompleteTimingRoots ??= {}; s.incompleteTimingRoots[token.root] = true; }
     const price = [5, 10, 7][i % 3], stage = s.stages[i];
     if (token.attempt === 0) stage.processed += 1; stage.costCents += price; s.costCents += price;
     const metric = s.inputMetrics[token.root] ??= { costCents: 0, finalOutputs: 0 }; metric.costCents += price;
@@ -390,9 +436,12 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
     }));
     if (terminal > 0 && settledOutputs > 0) s.predicted = Math.round(settledOutputs / terminal * e.inputCount!);
   }
-  recordTimeObservation(e);
+  recordTimeObservation(e); freezeProductionObservation(e, !queued(s));
   if (!queued(s)) {
-    if (s.stageRecovery) {
+    if (s.endedIntake) {
+      s.phase = 'completed'; e.runtime!.state = 'ended';
+      s.reason = '执行器已结束，不再从源头取数；已有批次处理完毕，导出由批次负责。';
+    } else if (s.stageRecovery) {
       const saved = s.stageRecovery;
       s.queues = saved.queues; s.phase = saved.returnPaused ? saved.phase : 'review';
       s.control = saved.control; s.manualAdmission = saved.manualAdmission; s.pausedStages = saved.pausedStages;
@@ -424,7 +473,7 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
 
 export function toggleStreamStage(w: LocalWorkspace, id: string, stage: number): LocalWorkspace {
  const next = cloneWorkspace(w), e = next.executors.find(e => e.id === id)!, s = e?.stream;
- if (!s || s.stageRecovery || e.runtime?.state !== 'running' || !s.queues[stage]) throw new Error('当前状态不能调整环节');
+ if (!s || s.stageRecovery || e.runtime?.state !== 'running' && !(s.endedIntake && s.phase === 'draining') || !s.queues[stage]) throw new Error('当前状态不能调整环节');
  s.stageClockBoundaryAt ??= Array(s.stages.length).fill(0); s.stageClockBoundaryAt[stage] = Date.now();
  const paused = s.pausedStages ?? []; s.pausedStages = paused.includes(stage) ? paused.filter(i => i !== stage) : [...paused, stage];
  event(s, `${s.pausedStages.includes(stage) ? '暂停' : '恢复'}第 ${stage + 1} 环节；整体控制与费用规则仍有效`); sync(next, e); return next;
@@ -439,8 +488,11 @@ export function refreshStreamEstimate(w: LocalWorkspace, id: string): LocalWorks
   if (!e || !s) throw new Error('请先运行，获得实际观测');
   const queued = new Set([...s.queues.flat(), ...(s.stageRecovery?.queues.flat() ?? [])].map(t => t.root));
   const roots = Object.keys(s.inputMetrics).map(Number).filter(root => !queued.has(root));
-  s.estimateRootIds = roots.slice(-1000); s.estimateConfigKey = estimateConfigurationKey(e);
-  s.estimateMetrics = Object.fromEntries(s.estimateRootIds.map(root => [root, { ...s.inputMetrics[root] }]));
+  prepareProductionObservation(e);
+  freezeProductionObservation(e, true);
+  s.estimateRootIds = s.productionObservation?.roots ?? [];
+  /* Legacy mirrors below do not invent time evidence. */
+  s.estimateMetrics = s.productionObservation?.metrics ?? {};
   s.estimateAtInputCount = roots.length;
   event(s, '手动刷新估算；样本不足时仍显示不足，不改变生产状态');
   return next;

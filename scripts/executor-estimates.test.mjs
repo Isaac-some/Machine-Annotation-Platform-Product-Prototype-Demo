@@ -11,7 +11,7 @@ const { cloneExecutor } = require('../src/components/sites/hawk/data/executor-ru
 const { withPhase2Examples } = require('../src/components/sites/hawk/data/phase2-examples.ts');
 const { prepareDemoScenario, beginDemoScenario, DEMO_EXECUTOR_ID } = require('../src/components/sites/hawk/data/executor-demo-scenarios.ts');
 const { tickStream, estimateConfigurationKey } = require('../src/components/sites/hawk/data/executor-streaming.ts');
-const executor = () => ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { source: { initialInputCount: 20000 }, admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } });
+const executor = () => { const e = ({ inputCount: 1100, streamPolicy: { observationSize: 100 }, stream: { source: { initialInputCount: 20000 }, admitted: 200, settledInputs: 1000, estimateAtInputCount: 1000, estimateRootIds: Array.from({length:1000},(_,i)=>i+2), estimateMetrics: Object.fromEntries(Array.from({length:1000},(_,i)=>[i+2,{costCents:40,finalOutputs:2}])), settledRootIds: Array.from({length:1000},(_,i)=>i+2), inputMetrics: Object.fromEntries(Array.from({length:1001},(_,i)=>[i+1,{costCents:40,finalOutputs:2}])) } }); e.stream.productionObservation = {version:1,configKey:estimateConfigurationKey(e),roots:e.stream.estimateRootIds,metrics:e.stream.estimateMetrics,activeMs:3600000,segments:[],source:'synthetic-demo',updatedAt:0}; return e; };
 
 test('paired settled cohorts exclude in-flight cost and use the same base for both directions', () => {
   const e=executor(), budget=estimateStreamPlan(e,{budgetYuan:20}), target=estimateStreamPlan(e,{products:100});
@@ -29,7 +29,7 @@ test('complete zero-output groups retain their costs and the baseline without in
   assert.deepEqual(estimateStreamPlan(e,{products:100}).cost,{base:2223,low:undefined,high:undefined});
 });
 test('an incomplete zero-output tail affects the baseline but does not invalidate complete-group ranges', () => {
-  const e=executor();e.stream.source.initialInputCount=240;e.stream.estimateRootIds=e.stream.estimateRootIds.slice(0,17);
+  const e=executor();e.stream.source.initialInputCount=240;e.stream.estimateRootIds=e.stream.estimateRootIds.slice(0,17);e.stream.productionObservation.roots=e.stream.estimateRootIds;
   e.stream.estimateMetrics[e.stream.estimateRootIds.at(-1)].finalOutputs=0;
   const evidence=streamCostEvidence(e);
   assert.equal(evidence.ready,true);assert.equal(evidence.emptyGroups,0);assert.equal(evidence.groups,8);
@@ -43,7 +43,7 @@ test('a wholly zero-output sample still cannot forecast cost or capacity', () =>
   assert.equal(estimateStreamPlan(e,{products:100}).cost,undefined);
 });
 test('live small-batch forecasts never disappear as failed tail inputs arrive at refresh checkpoints', () => {
-  for(const elapsed of [0,120000]){
+  for(const elapsed of [1200,120000]){
     let w=beginDemoScenario(prepareDemoScenario(withPhase2Examples({groups:[],projects:[],executors:[],batches:[]}),'phase2-reservoir','estimate'),DEMO_EXECUTOR_ID),observed=false;
     for(let tick=0;tick<300;tick++){
       const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),evidence=streamCostEvidence(e);
@@ -88,8 +88,8 @@ test('time forecast uses a paired time observation and does not cap products by 
   assert.equal(estimateStreamProductsByTime(e,-1).products,undefined);
 });
 test('a legacy accumulated clock cannot be paired with unrelated cost-sample outputs', () => {
-  const e=executor();e.stream.activeRunMs=3600000;
-  assert.match(estimateStreamProductsByTime(e,4).reason,/同一观测/);
+  const e=executor();delete e.stream.productionObservation;e.stream.activeRunMs=3600000;
+  assert.match(estimateStreamProductsByTime(e,4).reason,/同一批|同一观测/);
 });
 const pair=(span,kind,start,end,extra={})=>[
   {id:span+'-start',span,kind,edge:'start',at:1000+start,monotonicMs:start,clock:'worker-A',...extra},

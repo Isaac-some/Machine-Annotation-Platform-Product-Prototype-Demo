@@ -1,0 +1,119 @@
+{
+  "passed": true,
+  "sizes": [
+    {
+      "width": 1440,
+      "box": {
+        "x": 420,
+        "y": 100,
+        "width": 600,
+        "height": 550.375
+      },
+      "styles": {
+        ".ant-modal-confirm-title": {
+          "size": "18px",
+          "weight": "600",
+          "color": "rgba(0, 0, 0, 0.88)"
+        },
+        ".hawk-executor-resume-unlimited>strong": {
+          "size": "16px",
+          "weight": "600",
+          "color": "rgb(32, 42, 56)"
+        },
+        ".hawk-executor-resume-unlimited>p": {
+          "size": "14px",
+          "weight": "400",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-message": {
+          "size": "13px",
+          "weight": "500",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-description": {
+          "size": "12px",
+          "weight": "400",
+          "color": "rgb(104, 115, 132)"
+        }
+      }
+    },
+    {
+      "width": 1280,
+      "box": {
+        "x": 340,
+        "y": 100,
+        "width": 600,
+        "height": 550.375
+      },
+      "styles": {
+        ".ant-modal-confirm-title": {
+          "size": "18px",
+          "weight": "600",
+          "color": "rgba(0, 0, 0, 0.88)"
+        },
+        ".hawk-executor-resume-unlimited>strong": {
+          "size": "16px",
+          "weight": "600",
+          "color": "rgb(32, 42, 56)"
+        },
+        ".hawk-executor-resume-unlimited>p": {
+          "size": "14px",
+          "weight": "400",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-message": {
+          "size": "13px",
+          "weight": "500",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-description": {
+          "size": "12px",
+          "weight": "400",
+          "color": "rgb(104, 115, 132)"
+        }
+      }
+    },
+    {
+      "width": 1024,
+      "box": {
+        "x": 212,
+        "y": 100,
+        "width": 600,
+        "height": 550.375
+      },
+      "styles": {
+        ".ant-modal-confirm-title": {
+          "size": "18px",
+          "weight": "600",
+          "color": "rgba(0, 0, 0, 0.88)"
+        },
+        ".hawk-executor-resume-unlimited>strong": {
+          "size": "16px",
+          "weight": "600",
+          "color": "rgb(32, 42, 56)"
+        },
+        ".hawk-executor-resume-unlimited>p": {
+          "size": "14px",
+          "weight": "400",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-message": {
+          "size": "13px",
+          "weight": "500",
+          "color": "rgb(83, 96, 113)"
+        },
+        ".ant-alert-description": {
+          "size": "12px",
+          "weight": "400",
+          "color": "rgb(104, 115, 132)"
+        }
+      }
+    }
+  ],
+  "checks": [
+    "unlimited copy on all unset only",
+    "configured target does not claim unlimited",
+    "modal in viewport on 1440/1280/1024",
+    "typography hierarchy"
+  ]
+}
