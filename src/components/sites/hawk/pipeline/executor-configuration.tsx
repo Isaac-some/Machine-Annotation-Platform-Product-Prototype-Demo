@@ -27,7 +27,7 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
   const locked = Boolean(executor.runtime?.started);
   const limitsEditable = locked && executor.runMode === 'stream' && executor.stream?.phase !== 'completed' && !executor.stream?.endedIntake;
   return <Modal title={<div className="hawk-settings-heading"><span>输入及执行器配置</span><p>{limitsEditable ? '执行已开始，仅可修改运行限制；保存后不会自动继续。' : locked ? '执行已开始，当前配置仅供查看。' : '配置本次输入、执行方式与交付文件。'}</p></div>} open centered width={840} className="hawk-settings-modal hawk-executor-configuration" okText="保存配置" okButtonProps={{ disabled: locked && !limitsEditable }} cancelText={locked ? '关闭' : '取消'} onCancel={onCancel} onOk={async () => {
-    try { if (locked && !limitsEditable) return; const values = await form.validateFields(); await onSave({ ...values, streamPolicy: { maxRetries: 0, ...executor.streamPolicy, ...values.streamPolicy, targetOutputMode: 'count', targetOutputPercent: undefined, legacyTargetUnresolved: undefined, costLimitAction: 'drain' }, settings: executorSettings(values.settings) }); }
+    try { if (locked && !limitsEditable) return; const values = await form.validateFields(); await onSave({ ...values, count: (values.runMode ?? executor.runMode ?? 'batch') === 'batch' ? executor.inputCount ?? 1 : values.count, streamPolicy: { maxRetries: 0, ...executor.streamPolicy, ...values.streamPolicy, targetOutputMode: 'count', targetOutputPercent: undefined, legacyTargetUnresolved: undefined, costLimitAction: 'drain' }, settings: executorSettings(values.settings) }); }
     catch (issue) { if (issue instanceof Error) setError(issue.message); }
   }}>
     <Form form={form} disabled={locked && !limitsEditable} layout="vertical" initialValues={{ deliveryMode: executor.deliveryMode ?? 'sorted', resource: executor.input ?? '', count: executor.inputCount ?? 1, resourceType: executor.resourceType ?? 'video', settings: executorSettings(executor.settings), runMode: executor.runMode ?? 'batch', streamPolicy: { idleTimeoutMs: 600000, costLimitAction: 'drain', maxRetries: 0, observationSize: 1000, ...executor.streamPolicy } }}>
@@ -40,7 +40,7 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
           <Form.Item name="resource" label="资源路径 / 圈选 ID" rules={[{ required: true, whitespace: true, message: '请填写输入资源' }, { pattern: /^(tos|cid|local|https?):\/\/.+/i, message: '请填写 tos://、CID:// 或有效的资源路径' }]}><Input disabled={locked} placeholder="tos://目录/input.csv 或 CID://资源ID" /></Form.Item>
           <div className="hawk-executor-config-grid">
             <Form.Item name="resourceType" label="输入资源类型" rules={[{ required: true }]}><Select disabled={locked} options={[{ value: 'video', label: '视频' }, { value: 'image', label: '图片' }, { value: 'audio', label: '音频' }, { value: 'other', label: '其他' }]} /></Form.Item>
-            <Form.Item name="count" label="原始输入资源总量（条，原型模拟）" rules={[{ required: true, type: 'integer', min: 1, max: 10000, message: '原型支持 1–10,000 条模拟输入' }]}><InputNumber disabled={locked} min={1} max={10000} precision={0} style={{ width: '100%' }} /></Form.Item>
+            {runMode === 'stream' && <Form.Item name="count" label="原始输入资源总量（条，原型模拟）" rules={[{ required: true, type: 'integer', min: 1, max: 10000, message: '原型支持 1–10,000 条模拟输入' }]}><InputNumber disabled={locked} min={1} max={10000} precision={0} style={{ width: '100%' }} /></Form.Item>}
           </div>
           {locked && <Typography.Paragraph className="hawk-executor-config-note">执行已开始，输入资源已锁定；后续批次使用前一步产出。</Typography.Paragraph>}
         </div>

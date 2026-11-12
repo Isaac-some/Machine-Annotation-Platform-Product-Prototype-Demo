@@ -1,0 +1,17 @@
+const {chromium}=require('/Users/isaac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('fs'),assert=require('assert/strict'),path=require('path');
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{const p=await b.newPage({viewport:{width:1440,height:1100},deviceScaleFactor:1.5});
+ await p.goto(process.env.CHECK_URL||'http://127.0.0.1:3057/hawk/pipeline/executor/?id=phase2-time-basic&example=phase2');
+ await p.getByRole('button',{name:'输入及执行器配置',exact:true}).waitFor();
+ await p.evaluate(()=>{let w=JSON.parse(localStorage.getItem('annotation-demo.local-workspace.v2'));let e=w.executors.find(e=>e.id==='phase2-time-basic');e.runMode='batch';e.inputCount=678;e.input='tos://demo/phase2/fixed-input.csv';delete e.stream;e.runtime.started=false;e.runtime.state='ready';w.batches.filter(x=>e.runtime.batchIds.includes(x.id)).forEach(x=>{x.status='初始化';x.total=678;});localStorage.setItem('annotation-demo.local-workspace.v2',JSON.stringify(w));});
+ await p.reload();await p.getByRole('button',{name:'输入及执行器配置',exact:true}).click();const d=p.getByRole('dialog');
+ assert.equal(await d.getByLabel('原始输入资源总量（条，原型模拟）').count(),0);
+ await d.getByText('流式运行',{exact:true}).click();await d.getByLabel('原始输入资源总量（条，原型模拟）').fill('999');
+ await d.getByText('整批运行',{exact:true}).click();assert.equal(await d.getByLabel('原始输入资源总量（条，原型模拟）').count(),0);
+ await d.getByRole('button',{name:'保存配置',exact:true}).click();await d.waitFor({state:'hidden'});
+ await p.waitForFunction(()=>JSON.parse(localStorage.getItem('annotation-demo.local-workspace.v2')).executors.find(e=>e.id==='phase2-time-basic').inputCount===678);
+ await p.reload();await p.getByRole('button',{name:'输入及执行器配置',exact:true}).click();assert.equal(await d.getByLabel('原始输入资源总量（条，原型模拟）').count(),0);
+ await d.screenshot({path:path.join(__dirname,process.env.CHECK_URL?'batch-configuration-online.png':'batch-configuration.png')});
+ await d.getByRole('button',{name:/取\s*消/}).click();await p.getByRole('button',{name:'一键运行',exact:true}).click();
+ fs.writeFileSync(path.join(__dirname,process.env.CHECK_URL?'online-report.json':'report.json'),JSON.stringify({passed:true,checks:['整批无总量输入','切换流式仍可演示数量','切回整批不采用隐藏编辑值','保存并刷新正常','一键运行可操作']},null,2));console.log('Batch input UI checks passed');
+}finally{await b.close()}})().catch(e=>{console.error(e);process.exitCode=1});
