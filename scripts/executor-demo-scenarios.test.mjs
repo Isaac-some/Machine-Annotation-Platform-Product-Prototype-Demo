@@ -27,7 +27,9 @@ for(const scenario of DEMO_SCENARIOS)test(`demo reaches expected state within si
  for(let i=0;i<6;i++)w=S.tickStream(w,DEMO_EXECUTOR_ID,1200);
  const e=w.executors.find(e=>e.id===DEMO_EXECUTOR_ID),s=e.stream;
  if(DEMO_BOUNDARY_CIDS[scenario.id])assert.equal(e.input,DEMO_BOUNDARY_CIDS[scenario.id]);
- if(['cost','input','time','target','idle'].includes(scenario.id))assert.equal(s.stopReason,scenario.id);
+ if(['cost','input','target'].includes(scenario.id))assert.equal(s.stopReason,scenario.id);
+ if(scenario.id==='time') { assert.equal(s.stopReason, undefined); assert.equal(e.runtime.state, 'running'); }
+ if(scenario.id==='idle') { assert.equal(e.runtime.state, 'running'); assert(s.waitNotifications.some(n=>n.level==='normal')); }
  if(scenario.id==='csv')assert.equal(s.source.totalKnown,true);
  if(scenario.id==='csv-invalid')assert.match(s.source.error,/RowKey/);
  if(scenario.id==='insufficient')assert.equal(s.source.waiting,true);

@@ -23,24 +23,20 @@ test('depletion waits without accruing processing time; explicit source end comp
   w = S.recordStreamSourceEvent(w, id, { kind: 'end' }); w = tick(w);
   assert.equal(get(w).stream.phase, 'completed'); assert.equal(get(w).runtime.state, 'completed');
 });
-test('each type of source activity resets the deadline, including large-file transfer progress', () => {
+test('heartbeats, messages and transfer progress do not reset a no-data waiting episode', () => {
   for (const kind of ['message', 'heartbeat', 'progress']) {
-    let w = tick(fresh()); const start = get(w).stream.source.lastActivityAt;
-    w = S.recordStreamSourceEvent(w, id, { kind }, start + 590000);
-    w = S.tickStream(w, id, 0, start + 600000);
-    assert.equal(get(w).stream.phase, 'production', kind);
-    w = S.tickStream(w, id, 0, start + 1190000);
-    assert.equal(get(w).stream.phase, 'review', kind); assert.equal(get(w).stream.stopReason, 'idle');
+    let w = tick(fresh()); const since = get(w).stream.waitingEpisode.since;
+    w = S.recordStreamSourceEvent(w, id, { kind }, since + 590000); w = S.tickStream(w, id, 0, since + 1800000);
+    assert.equal(get(w).runtime.state, 'running'); assert.equal(get(w).stream.waitingEpisode.since, since);
+    assert.equal(get(w).stream.waitNotifications.length, 1);
   }
 });
-test('late data after idle timeout is retained but cannot automatically restart intake', () => {
-  let w = tick(fresh()); const time = get(w).stream.source.lastActivityAt + 600000;
-  w = tick(w, 1, time); const admitted = get(w).stream.admitted, cost = get(w).stream.costCents;
-  w = S.recordStreamSourceEvent(w, id, { kind: 'data', count: 3 }, time + 1);
-  w = tick(w, 10, time + 2);
-  assert.equal(get(w).stream.admitted, admitted); assert.equal(get(w).runtime.state, 'waiting');
-  w = S.resumeStream(w, id, time + 3); w = tick(w, 100, time + 4);
-  assert.equal(get(w).stream.admitted, admitted + 3); assert(get(w).stream.costCents > cost);
+test('data arriving after a long wait automatically resumes production', () => {
+  let w = tick(fresh()); const since = get(w).stream.waitingEpisode.since;
+  w = tick(w, 1, since + 3600000); const admitted = get(w).stream.admitted;
+  assert.equal(get(w).runtime.state, 'running');
+  w = S.recordStreamSourceEvent(w, id, { kind: 'data', count: 3 }, since + 3600001); w = tick(w, 100, since + 3600002);
+  assert.equal(get(w).stream.admitted, admitted + 3); assert.equal(get(w).runtime.state, 'running');
 });
 test('source failure stops intake, drains admitted work and blocks resume until check recovery', () => {
   let w = tick(fresh(), 2); const admitted = get(w).stream.admitted;
@@ -65,13 +61,13 @@ test('configuration updates preserve counters and a latched stop; unrelated prod
   }
   w = R.changeExecutorState(w, id, 'resume'); assert.equal(get(w).runtime.state, 'running');
 });
-test('every reached cost/input/time ceiling blocks resume and manual retry, including simultaneous ceilings', () => {
-  for (const ceiling of ['cost', 'input', 'time', 'all']) {
+test('every reached cost/input/target ceiling blocks resume and manual retry, including simultaneous ceilings', () => {
+  for (const ceiling of ['cost', 'input', 'target', 'all']) {
     let w = tick(fresh()); const e = get(w), s = e.stream;
-    e.runtime.state = 'paused'; assert(s.failures.length);
+    e.runtime.state = 'paused'; s.failures.push({ key: 'blocked', root: 1, stage: 0, attempt: 1 });
     if (ceiling === 'cost' || ceiling === 'all') s.costLimitCents = e.streamPolicy.costLimitCents = s.costCents;
     if (ceiling === 'input' || ceiling === 'all') e.streamPolicy.inputLimit = s.admitted;
-    if (ceiling === 'time' || ceiling === 'all') e.streamPolicy.runtimeLimitMs = s.activeRunMs = 1;
+    if (ceiling === 'target' || ceiling === 'all') e.streamPolicy.targetOutputCount = s.stages.at(-1).outputs;
     assert.throws(() => S.resumeStream(w, id), /输入及执行器配置/);
     assert.equal(R.canExecutorAction(w, e, 'resume'), false);
     assert.throws(() => S.retryStreamStage(w, id, s.failures[0].stage), /输入及执行器配置/);
@@ -84,9 +80,11 @@ test('completed legacy records do not reopen and source events cannot mutate the
   const before = JSON.stringify(w); assert.equal(S.tickStream(w, id), w);
   assert.throws(() => S.recordStreamSourceEvent(w, id, { kind: 'data', count: 1 })); assert.equal(JSON.stringify(w), before);
 });
-test('a configured idle timeout must be a positive finite integer duration', () => {
+test('waiting reminder thresholds require positive integer minutes and increasing escalation', () => {
   const e = get(fresh());
-  for (const idleTimeoutMs of [0, -1, Infinity, NaN, 0.5]) assert.throws(() => S.validateStreamPolicy({ ...e.streamPolicy, idleTimeoutMs }, 6));
+  for (const waitingNormalMinutes of [0, -1, Infinity, NaN, 0.5]) assert.throws(() => S.validateStreamPolicy({ ...e.streamPolicy, waitingNormalMinutes }, 6));
+  assert.throws(() => S.validateStreamPolicy({ ...e.streamPolicy, waitingNormalMinutes: 60, waitingUrgentMinutes: 30 }, 6));
+  assert.doesNotThrow(() => S.validateStreamPolicy({ ...e.streamPolicy, waitingNormalMinutes: 30, waitingUrgentMinutes: 60 }, 6));
 });
 
 test('an open exhausted source is not falsely reported as permanently insufficient supply', () => {
@@ -98,12 +96,10 @@ test('an open exhausted source is not falsely reported as permanently insufficie
   assert.equal(T.streamForecastSupply(e).status, 'exhausted');
   assert.match(T.forecastSupplyWarning(e, 100), /输入供给已结束/);
 });
-test('check failure arriving while already idle-paused does not leave an undrainable state', () => {
-  let w = tick(fresh()); w = tick(w, 1, get(w).stream.source.lastActivityAt + 600000);
-  assert.equal(get(w).stream.phase, 'review');
-  w = S.recordStreamSourceEvent(w, id, {kind: 'error', message:'暂时不可达'});
-  assert.equal(get(w).stream.phase, 'review');
-  w = S.recordStreamSourceEvent(w, id, {kind: 'recovered'});
+test('check failure while manually paused requires recovery and explicit continue', () => {
+  let w = tick(fresh()); w = R.changeExecutorState(w, id, 'pause');
+  w = S.recordStreamSourceEvent(w, id, { kind: 'error', message: '暂时不可达' }); assert.equal(get(w).stream.phase, 'review');
+  w = S.recordStreamSourceEvent(w, id, { kind: 'recovered' }); assert.equal(get(w).runtime.state, 'paused');
   assert.equal(get(S.resumeStream(w,id)).runtime.state, 'running');
 });
 

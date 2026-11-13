@@ -2,7 +2,7 @@ import { DEMO_BOUNDARY_CIDS, DEMO_SCENARIOS } from './data/executor-demo-scenari
 export const executorDemoPath = (scene: string, panel?: string) => `/hawk/pipeline/executor/?id=executor-demo-showcase&demo=${scene}${panel ? `&panel=${panel}` : ''}`;
 export const DEMO_ENTRIES = [
   ...DEMO_SCENARIOS.map(s => ({ key: s.id, title: s.title, description: `${s.id in DEMO_BOUNDARY_CIDS ? DEMO_BOUNDARY_CIDS[s.id as keyof typeof DEMO_BOUNDARY_CIDS] + ' · ' : ''}${s.expected}`,  path: executorDemoPath(s.id) })),
-  { key: 'configuration', title: '输入与运行限制配置', description: '输入、成品目标、成本和时长上限', path: executorDemoPath('insufficient', 'configuration') },
+  { key: 'configuration', title: '输入与运行限制配置', description: '输入、成品目标、成本上限和等待提醒', path: executorDemoPath('insufficient', 'configuration') },
   { key: 'details', title: '成本与环节运行详情', description: '各环节投入、产物、失败和费用', path: executorDemoPath('retry', 'details') },
   { key: 'calculator', title: '成本与时间计算器', description: '按预算、时长或目标成品试算', path: executorDemoPath('retry', 'calculator') },
   { key: 'clone', title: '克隆执行器', description: '独立选择继承配置与输入', path: executorDemoPath('retry', 'clone') },

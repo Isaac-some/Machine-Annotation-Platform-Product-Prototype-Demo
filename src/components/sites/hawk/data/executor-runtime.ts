@@ -82,9 +82,9 @@ export function configureExecutor(workspace: LocalWorkspace, id: string, input: 
     const before = original.streamPolicy!, after = input.streamPolicy;
     if (!after) throw new Error('请填写运行限制');
     for (const key of Object.keys({ ...before, ...after }) as (keyof StreamPolicy)[]) {
-      if (!['costLimitCents', 'inputLimit', 'runtimeLimitMs', 'idleTimeoutMs', 'costLimitAction', 'targetOutputCount', 'targetOutputPercent', 'targetOutputMode', 'legacyTargetUnresolved'].includes(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) throw new Error('执行已开始，只能修改运行限制');
+      if (!['costLimitCents', 'inputLimit', 'runtimeLimitMs', 'idleTimeoutMs', 'reminderRatio', 'waitingReminderEnabled', 'waitingNormalMinutes', 'waitingUrgentMinutes', 'costLimitAction', 'targetOutputCount', 'targetOutputPercent', 'targetOutputMode', 'legacyTargetUnresolved'].includes(key) && JSON.stringify(before[key]) !== JSON.stringify(after[key])) throw new Error('执行已开始，只能修改运行限制');
     }
-    return setStreamLimits(workspace, id, { costLimitCents: after.costLimitCents, inputLimit: after.inputLimit, runtimeLimitMs: after.runtimeLimitMs, idleTimeoutMs: after.idleTimeoutMs, targetOutputCount: after.targetOutputCount });
+    return setStreamLimits(workspace, id, { costLimitCents: after.costLimitCents, inputLimit: after.inputLimit, waitingReminderEnabled: after.waitingReminderEnabled, waitingNormalMinutes: after.waitingNormalMinutes, waitingUrgentMinutes: after.waitingUrgentMinutes, targetOutputCount: after.targetOutputCount });
   }
   if (original.runtime.state === 'running') throw new Error('请先暂停，再调整输入及执行器配置');
   validateExecutorSettings(input.settings);
@@ -134,7 +134,7 @@ export function changeExecutorState(workspace: LocalWorkspace, id: string, actio
   const next = copy(workspace);
   const executor = next.executors.find(item => item.id === id)!;
   const runtime = executor.runtime!;
-  if (executor.runMode === 'stream') { if (executor.stream) executor.stream.clockBoundaryAt = Date.now(); runtime.state = action === 'pause' ? 'paused' : 'running'; executorBatches(next, executor).forEach(b => { b.status = action === 'pause' ? '已暂停' : '运行中'; b.nodes.forEach(node => { if (action === 'pause' && node.status !== '已完成') node.status = '已暂停'; }); }); return next; }
+  if (executor.runMode === 'stream') { if (executor.stream) { executor.stream.clockBoundaryAt = Date.now(); executor.stream.waitingEpisode = undefined; } runtime.state = action === 'pause' ? 'paused' : 'running'; executorBatches(next, executor).forEach(b => { b.status = action === 'pause' ? '已暂停' : '运行中'; b.nodes.forEach(node => { if (action === 'pause' && node.status !== '已完成') node.status = '已暂停'; }); }); return next; }
   const batches = executorBatches(next, executor);
   const batch = batches[runtime.currentIndex];
   const now = timestamp();

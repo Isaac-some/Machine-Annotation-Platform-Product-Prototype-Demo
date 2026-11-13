@@ -1,3 +1,4 @@
+import { updateStreamWaiting } from './executor-waiting';
 import { prepareProductionObservation, freezeProductionObservation, productionConfigurationKey, type ProductionObservation } from './executor-production-observation';
 import { observationCheckpoints, observationStep as percentStep, validateDemoCount } from './executor-observation';
 import type { LocalExecutor, LocalWorkspace } from './local-workspace';
@@ -11,7 +12,11 @@ export type StreamPolicy = {
   targetOutputMode?: 'count' | 'percent';
   costLimitCents?: number;
   costLimitAction?: 'drain' | 'continue';
+  /** Legacy saved fields are accepted but no longer control production. */
   idleTimeoutMs?: number;
+  waitingReminderEnabled?: boolean;
+  waitingNormalMinutes?: number;
+  waitingUrgentMinutes?: number;
   inputLimit?: number;
   runtimeLimitMs?: number;
   targetOutputCount?: number;
@@ -27,6 +32,10 @@ export type StreamPolicy = {
 export type StreamToken = { key: string; root: number; stage: number; attempt: number };
 export type StreamStage = { processed: number; failed: number; outputs: number; costCents: number };
 export type StreamRun = {
+  automaticRetrying?: boolean;
+  automaticRetries?: Record<string, boolean>;
+  waitingEpisode?: { since: number; normalSent: boolean; urgentSent: boolean };
+  waitNotifications?: { at: number; level: 'normal' | 'urgent'; text: string }[];
   productionObservation?: ProductionObservation;
   productionSampling?: { configKey: string; afterRoot: number; lastStep: number };
   incompleteTimingRoots?: Record<number, boolean>;
@@ -80,14 +89,13 @@ export function validateStreamPolicy(policy: StreamPolicy, count: number) {
   if (policy.legacyTargetUnresolved) throw new Error('旧成品目标缺少原始输入基准，请重新确认数量目标');
   if (policy.costLimitCents !== undefined && (!Number.isSafeInteger(policy.costLimitCents) || policy.costLimitCents <= 0)) throw new Error('总成本上限须为大于 0 的金额，或留空');
   if (policy.costLimitAction !== undefined && !['drain', 'continue'].includes(policy.costLimitAction)) throw new Error('请选择触碰成本上限后的处理方式');
-  for (const [key, label] of [['idleTimeoutMs', '无输入源活动等待时长'], ['inputLimit', '输入条数上限'], ['runtimeLimitMs', '运行时长上限'], ['targetOutputCount', '目标成品量']] as const) {
+  for (const [key, label] of [['inputLimit', '输入条数上限'], ['targetOutputCount', '目标成品量'], ['waitingNormalMinutes', '普通提醒时间'], ['waitingUrgentMinutes', '加急提醒时间']] as const) {
     const value = policy[key];
     if (value !== undefined && (!Number.isSafeInteger(value) || value <= 0)) throw new Error(`${label}须为正整数，或留空`);
   }
   if (policy.targetOutputPercent !== undefined && (!Number.isFinite(policy.targetOutputPercent) || policy.targetOutputPercent <= 0 || policy.targetOutputPercent > 100)) throw new Error('目标成品比例须大于 0 且不超过 100%，或留空');
   if (policy.targetOutputPercent !== undefined && policy.targetOutputCount !== undefined) throw new Error('目标成品量只能设置数量或比例其中一种');
-  if (!Number.isSafeInteger(policy.maxRetries) || policy.maxRetries < 0) throw new Error('请填写有限的非负整数重试次数，0 表示不自动重试');
-  if (policy.reminderRatio !== undefined && (!Number.isFinite(policy.reminderRatio) || policy.reminderRatio <= 0 || policy.reminderRatio >= 100)) throw new Error('提前提醒比例须大于 0 且小于 100%，也可留空');
+  if ((policy.waitingUrgentMinutes ?? 60) <= (policy.waitingNormalMinutes ?? 30)) throw new Error('加急提醒时间须晚于普通提醒时间');
   if (policy.observationSize !== undefined && (!Number.isSafeInteger(policy.observationSize) || policy.observationSize < 100 || policy.observationSize > 1000 || policy.observationSize % 100 !== 0)) throw new Error('估算刷新步长须为 100 至 1,000 条之间的百数整数');
 }
 export function newStreamRun(stages: number, costLimitCents?: number): StreamRun {
@@ -108,7 +116,7 @@ export function startStream(w: LocalWorkspace, id: string): LocalWorkspace {
   event(e.stream, '开始连续生产；成本上限为可选项，预测将随演示观测数据更新');
   sync(next, e); return next;
 }
-export type StreamLimits = Pick<StreamPolicy, 'costLimitCents' | 'inputLimit' | 'runtimeLimitMs' | 'idleTimeoutMs' | 'targetOutputCount'>;
+export type StreamLimits = Pick<StreamPolicy, 'costLimitCents' | 'inputLimit' | 'targetOutputCount' | 'waitingReminderEnabled' | 'waitingNormalMinutes' | 'waitingUrgentMinutes'>;
 export function setStreamCostLimit(w: LocalWorkspace, id: string, cents?: number): LocalWorkspace {
   const e = w.executors.find(x => x.id === id);
   return setStreamLimits(w, id, { ...e?.streamPolicy, costLimitCents: cents });
@@ -117,12 +125,11 @@ export function setStreamLimits(w: LocalWorkspace, id: string, limits: StreamLim
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e?.stream;
   if (!s || !e.streamPolicy || s.phase === 'completed' || s.endedIntake) throw new Error('当前状态不能调整运行限制');
   const previousBlocks = streamLimitBlocks(e);
-  const policy = { ...e.streamPolicy, ...limits, targetOutputPercent: undefined, targetOutputMode: 'count' as const, legacyTargetUnresolved: undefined, costLimitCents: limits.costLimitCents, inputLimit: limits.inputLimit, runtimeLimitMs: limits.runtimeLimitMs, costLimitAction: 'drain' as const };
+  const policy = { ...e.streamPolicy, ...limits, targetOutputPercent: undefined, targetOutputMode: 'count' as const, legacyTargetUnresolved: undefined, costLimitCents: limits.costLimitCents, inputLimit: limits.inputLimit, targetOutputCount: limits.targetOutputCount, runtimeLimitMs: undefined, idleTimeoutMs: undefined, reminderRatio: undefined, costLimitAction: 'drain' as const };
   validateStreamPolicy(policy, e.inputCount!);
   // Unchanged limits may already be reached; editing another field must remain possible.
   if (limits.costLimitCents !== e.streamPolicy.costLimitCents && limits.costLimitCents !== undefined && limits.costLimitCents <= s.costCents) throw new Error('成本上限须高于当前累计费用，或留空取消');
   if (limits.inputLimit !== e.streamPolicy.inputLimit && limits.inputLimit !== undefined && limits.inputLimit <= s.admitted) throw new Error('输入条数上限须高于已取入条数，或留空取消');
-  if (limits.runtimeLimitMs !== e.streamPolicy.runtimeLimitMs && limits.runtimeLimitMs !== undefined && (s.activeRunMs === undefined || limits.runtimeLimitMs <= s.activeRunMs)) throw new Error('运行时长上限须高于已累计运行时长，且计时记录完整；或留空取消');
   if (limits.targetOutputCount !== e.streamPolicy.targetOutputCount && limits.targetOutputCount !== undefined && limits.targetOutputCount <= (s.stages.at(-1)?.outputs ?? 0)) throw new Error('成品目标须高于当前累计成品数，或留空取消');
   if (s.costLimitCents !== policy.costLimitCents) { s.triggerCostCents = undefined; s.drainFinalCents = undefined; s.reminded = false; }
   e.streamPolicy = policy; s.costLimitCents = policy.costLimitCents;
@@ -141,8 +148,10 @@ export function recordStreamSourceEvent(w: LocalWorkspace, id: string, signal: S
     validateDemoCount((e.inputCount ?? 0) + signal.count);
     if (!Number.isSafeInteger(signal.count) || signal.count < 1 || !Number.isSafeInteger((e.inputCount ?? 0) + signal.count)) throw new Error('新增数据量须为正整数');
     e.inputCount = (e.inputCount ?? 0) + signal.count;
+    if (e.runtime?.state === 'running' && s.phase === 'production') s.reason = s.automaticRetrying ? '收到新数据，待本轮重试及下游处理结束后自动接续' : '收到新数据，正在自动接续处理';
   }
-  s.source.lastActivityAt = now; s.source.waiting = false;
+  s.source.lastActivityAt = now;
+  if (['data', 'end', 'error'].includes(signal.kind)) { s.source.waiting = false; s.waitingEpisode = undefined; }
   if (signal.kind === 'end') s.source.closed = true;
   if (signal.kind === 'recovered' || signal.kind === 'data') s.source.error = undefined;
   if (signal.kind === 'error') {
@@ -169,12 +178,12 @@ export function streamLimitBlocks(e: LocalExecutor): string[] {
   const s = e.stream, p = e.streamPolicy; if (!s || !p) return [];
   return [p.costLimitCents !== undefined && s.costCents >= p.costLimitCents ? '成本上限' : undefined,
     p.inputLimit !== undefined && s.admitted >= p.inputLimit ? '取入上限' : undefined,
-    p.runtimeLimitMs !== undefined && (s.activeRunMs === undefined || s.activeRunMs >= p.runtimeLimitMs) ? '时长上限' : undefined,
     p.targetOutputCount !== undefined && (s.stages.at(-1)?.outputs ?? 0) >= p.targetOutputCount ? '成品目标' : undefined].filter((x): x is string => Boolean(x));
 }
 export function endStream(w: LocalWorkspace, id: string): LocalWorkspace {
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id), s = e?.stream;
   if (!e?.runtime || !s || !['paused', 'waiting'].includes(e.runtime.state) || s.phase === 'draining' || s.stageRecovery || s.endedIntake) throw new Error('请先暂停并等待当前操作完成，再结束执行器');
+  s.waitingEpisode = undefined;
   s.endedIntake = true; s.phase = queued(s) ? 'draining' : 'completed'; s.manualAdmission = false;
   s.clockBoundaryAt = Date.now();
   if (s.source) s.source.closed = true;
@@ -185,6 +194,7 @@ export function resumeStream(w: LocalWorkspace, id: string, now = Date.now()): L
   const next = cloneWorkspace(w), e = next.executors.find(x => x.id === id)!, s = e?.stream;
   if (!s || !e.runtime || !(['paused', 'waiting'].includes(e.runtime.state)) || s.phase === 'completed' || s.phase === 'draining') throw new Error('请等待收尾完成，再继续运行');
   const blocked = streamRunBlockReason(e, next); if (blocked) throw new Error(blocked);
+  s.waitingEpisode = undefined;
   s.stopReason = undefined; s.control = 'automatic'; s.phase = 'production'; s.manualAdmission = true;
   s.clearedLimits = [];
   s.triggerCostCents = undefined; s.drainFinalCents = undefined;
@@ -200,18 +210,17 @@ export function buildUpstreamInputRequest(e: LocalExecutor) {
     schemaVersion: 1, executorId: e.id, targetOutputCount,
     deliveredOutputCount: e.stream?.stages.at(-1)?.outputs ?? 0,
     observation: { settledInputCount: e.stream?.settledInputs ?? 0, settledOutputCount: e.stream?.settledRootIds.reduce((sum, root) => sum + (e.stream?.inputMetrics[root]?.finalOutputs ?? 0), 0) ?? 0, completedAutomaticRetryRounds: e.stream?.retryRound ?? 0, manualRecoveryRuns: e.stream?.recoveryRuns ?? 0 },
-    retryPolicy: { maxRetries: e.streamPolicy!.maxRetries, scope: 'failed-stage-then-downstream' as const, manualRetryRequiresUserAction: true },
+    retryPolicy: { maxRetries: 1, scope: 'failed-stage-then-downstream' as const, manualRetryRequiresUserAction: true },
     estimateStatus: 'awaiting-upstream' as const,
   };
 }
 function runnableStages(s: StreamRun) {
   return s.queues.map((q, i) => q.length > 0 && !s.pausedStages?.includes(i) && !(i + 1 < s.queues.length && s.pausedStages?.includes(i + 1) && s.queues[i + 1].length > 0));
 }
-function runLimitReason(e: LocalExecutor): 'cost' | 'input' | 'time' | 'target' | undefined {
+function runLimitReason(e: LocalExecutor): 'cost' | 'input' | 'target' | undefined {
   const p = e.streamPolicy!, s = e.stream!;
   if (s.costLimitCents !== undefined && s.costCents >= s.costLimitCents) return 'cost';
   if (p.inputLimit !== undefined && s.admitted >= p.inputLimit) return 'input';
-  if (p.runtimeLimitMs !== undefined && (s.activeRunMs ?? 0) >= p.runtimeLimitMs) return 'time';
   const targetOutputCount = effectiveTargetOutputCount(p, s.source?.initialInputCount ?? e.inputCount ?? 0);
   if (targetOutputCount !== undefined && (s.stages.at(-1)?.outputs ?? 0) >= targetOutputCount) return 'target';
 }
@@ -222,18 +231,17 @@ function enforceRunLimits(e: LocalExecutor) {
   if (targetDraining && reason === 'target') return;
   s.stopReason = reason; s.phase = 'draining';
   s.reason = reason === 'target'
-    ? '达到目标成品量：停止新增输入，在途任务继续收尾；失败数据仍按配置次数自动重试'
+    ? '达到目标成品量：停止新增输入及新增自动重试，在途任务继续收尾'
     : `${reason === 'cost' ? '达到成本上限' : reason === 'input' ? '达到输入条数上限' : '达到累计运行时长上限'}：停止新增输入及自动重试，在途任务继续收尾`;
   event(s, s.reason);
 }
+function automaticRetryEligible(s: StreamRun, token: StreamToken) {
+  return token.attempt === 0 && !s.automaticRetries?.[`${token.stage}:${token.key}`];
+}
 function canAutomaticallyRetry(e: LocalExecutor) {
-  const s = e.stream!, p = e.streamPolicy!, reason = runLimitReason(e);
-  if (s.control !== 'automatic' || !s.failures.length || s.retryRound >= p.maxRetries) return false;
-  if ((s.costLimitCents !== undefined && s.costCents >= s.costLimitCents) || reason === 'input' || reason === 'time') return false;
-  if (s.stopReason === 'idle' || s.stopReason === 'source-error') return false;
-  // A goal stops admission only; retry rounds may finish the admitted subset.
-  return s.phase === 'production' && s.admitted === e.inputCount
-    || s.phase === 'draining' && s.stopReason === 'target' && reason === 'target';
+  const s = e.stream!;
+  return s.control === 'automatic' && s.phase === 'production' && !s.source?.error && !runLimitReason(e)
+    && s.admitted === e.inputCount && s.failures.some(token => automaticRetryEligible(s, token));
 }
 
 export function takeOverStream(w: LocalWorkspace, id: string): LocalWorkspace {
@@ -257,7 +265,8 @@ export function retryStreamStage(w: LocalWorkspace, id: string, stageIndex: numb
   if (e.runtime?.state !== 'paused' && !['review', 'completed'].includes(s.phase)) throw new Error('请先暂停执行器，再重试该批次失败数据');
   if (s.phase === 'draining') throw new Error('请等待已取入数据收尾完成，再重试');
   const blocked = streamRunBlockReason(e, next); if (blocked) throw new Error(blocked);
-  s.stageRecovery = { stage: stageIndex, preparation: 0, queues: s.queues, phase: s.phase, control: s.control, manualAdmission: s.manualAdmission, pausedStages: s.pausedStages, returnPaused: e.runtime?.state === 'paused' };
+  s.waitingEpisode = undefined; s.automaticRetrying = false;
+  s.stageRecovery = { stage: stageIndex, preparation: 0, queues: s.queues, phase: s.phase, control: s.control, manualAdmission: s.manualAdmission, pausedStages: s.pausedStages, returnPaused: true };
   s.queues = s.queues.map(() => []);
   failed.forEach(token => s.queues[stageIndex].push({ ...token, attempt: token.attempt + 1 }));
   s.failures = s.failures.filter(token => token.stage !== stageIndex);
@@ -349,11 +358,6 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
     spans.forEach((span, i) => { s.stageActiveMs![i] += span; });
   }
   enforceRunLimits(e);
-  if (s.source && !s.source.closed && s.phase === 'production' && !s.stageRecovery && s.admitted >= (e.inputCount ?? 0) && now - s.source.lastActivityAt >= (p.idleTimeoutMs ?? 600000)) {
-    s.stopReason = 'idle'; s.phase = 'draining';
-    s.reason = `输入源连续 ${(p.idleTimeoutMs ?? 600000) / 60000} 分钟无活动，已停止取数，在途任务继续收尾`;
-    event(s, s.reason);
-  }
   for (let i = s.queues.length - 1; i >= 0; i--) {
     if (s.pausedStages?.includes(i) || i + 1 < s.queues.length && s.pausedStages?.includes(i + 1) && s.queues[i + 1].length > 0) continue;
     const token = s.queues[i].shift(); if (!token) continue;
@@ -363,7 +367,7 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
     const price = [5, 10, 7][i % 3], stage = s.stages[i];
     if (token.attempt === 0) stage.processed += 1; stage.costCents += price; s.costCents += price;
     const metric = s.inputMetrics[token.root] ??= { costCents: 0, finalOutputs: 0 }; metric.costCents += price;
-    const failed = token.attempt === 0 && (s.demoOutcome === 'zero' && i === s.queues.length - 1 || i === 0 && token.root % 5 === 0 || i === 1 && token.root % 7 === 0);
+    const failed = s.demoOutcome === 'zero' && i === s.queues.length - 1 || token.attempt === 0 && (i === 0 && token.root % 5 === 0 || i === 1 && token.root % 7 === 0);
     if (failed) { stage.failed += 1; s.failures.push(token); }
     else {
       const multiplicity = i === 0 && token.root % 2 === 1 ? 2 : 1;
@@ -385,10 +389,9 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       event(s, message); costPrompt(s, message, notificationLevel(e, 'stop'));
     }
   }
-  if (s.costLimitCents && p.reminderRatio !== undefined && !s.reminded && s.costCents >= s.costLimitCents * p.reminderRatio / 100) { s.reminded = true; costPrompt(s, '成本上限提前提醒', notificationLevel(e, 'reminder')); event(s, `费用达到上限 ${p.reminderRatio}% 的提前提醒；继续运行`); }
   enforceRunLimits(e);
   const limit = e.inputCount!;
-  if (s.phase === 'production' && (s.control === 'automatic' || s.manualAdmission) && !s.pausedStages?.some(i => i === 0 || s.queues[i].length > 0) && s.admitted < limit) {
+  if (!s.automaticRetrying && s.phase === 'production' && (s.control === 'automatic' || s.manualAdmission) && !s.pausedStages?.some(i => i === 0 || s.queues[i].length > 0) && s.admitted < limit) {
     if (s.source) { s.source.lastActivityAt = now; s.source.waiting = false; }
     s.admitted += 1; s.queues[0].push({ key: String(s.admitted), root: s.admitted, stage: 0, attempt: 0 });
   }
@@ -437,7 +440,9 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
     if (terminal > 0 && settledOutputs > 0) s.predicted = Math.round(settledOutputs / terminal * e.inputCount!);
   }
   recordTimeObservation(e); freezeProductionObservation(e, !queued(s));
+  if (queued(s) || s.admitted < (e.inputCount ?? 0)) s.waitingEpisode = undefined;
   if (!queued(s)) {
+    s.automaticRetrying = false;
     if (s.endedIntake) {
       s.phase = 'completed'; e.runtime!.state = 'ended';
       s.reason = '执行器已结束，不再从源头取数；已有批次处理完毕，导出由批次负责。';
@@ -449,15 +454,19 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       s.reason = saved.returnPaused ? '本轮重试及下游处理结束；原有队列与进度已保留，点击继续运行恢复生产' : '本轮重试及下游处理结束，可查看结果';
       event(s, s.reason);
     } else if (canAutomaticallyRetry(e)) {
-      s.retryRound += 1; s.failures.forEach(t => { s.queues[t.stage].push({ ...t, attempt: t.attempt + 1 }); s.stages[t.stage].failed -= 1; }); s.failures = [];
-      const retryReason = `已取入数据本轮处理结束，启动第 ${s.retryRound} 轮有限自动重试`;
+      const retry = s.failures.filter(token => automaticRetryEligible(s, token));
+      s.automaticRetries ??= {}; s.automaticRetrying = true; s.waitingEpisode = undefined;
+      s.retryRound += 1;
+      retry.forEach(t => { s.automaticRetries![`${t.stage}:${t.key}`] = true; s.queues[t.stage].push({ ...t, attempt: t.attempt + 1 }); s.stages[t.stage].failed -= 1; });
+      s.failures = s.failures.filter(token => !retry.includes(token));
+      const retryReason = `当前可用数据已处理结束，自动补试 ${retry.length} 条失败数据；每条数据在同一失败环节最多一次`;
       if (s.stopReason === 'target') s.reason = `目标成品量已达到，不新增输入；${retryReason}`;
       event(s, retryReason);
     } else if (s.phase === 'draining' || s.control === 'manual') {
       if (s.triggerCostAction === 'drain' && s.drainFinalCents === undefined) s.drainFinalCents = s.costCents;
       s.manualAdmission = false; s.phase = 'review'; e.runtime!.state = 'waiting';
       s.reason = s.stopReason === 'idle' ? '输入源无活动超时，取数已暂停；源活动恢复后仍须在主界面手动继续' : s.stopReason === 'source-error' ? `输入源检查失败：${s.source?.error ?? '检查不可用'}；取数已暂停` : s.stopReason === 'target' && (s.costLimitCents === undefined || s.costCents < s.costLimitCents)
-        ? `目标成品量已达到，已取入数据及有限自动重试已处理结束${s.failures.length ? '；仍有失败数据，可人工补救' : ''}`
+        ? `目标成品量已达到，已取入数据已完成收尾${s.failures.length ? '；仍有失败数据，可人工补救' : ''}`
         : '已取入数据收尾完成；检查运行结果后可调整运行上限并人工继续';
       event(s, `收尾结束，累计费用 ¥${(s.costCents / 100).toFixed(2)}`);
     } else if (s.phase === 'production' && s.admitted === e.inputCount && s.source && !s.source.closed) {
@@ -468,6 +477,7 @@ export function tickStream(w: LocalWorkspace, id: string, observedProcessingMs =
       s.reason = targetOutputCount && (s.stages.at(-1)?.outputs ?? 0) < targetOutputCount ? '本轮已有输入已处理结束，尚未达到目标成品量；查看结果后可自行决定是否重试失败数据' : s.failures.length ? '有限重试已结束，仍有失败数据，可人工接管原位补救' : '本次输入已处理完成'; event(s, s.reason);
     }
   }
+  updateStreamWaiting(e, now);
   sync(next, e); return next;
 }
 

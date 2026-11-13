@@ -1,20 +1,14 @@
 import type { LocalExecutor } from './local-workspace';
 import { streamCostEvidence } from './executor-stream-estimates';
-import { streamTimeEvidence } from './executor-time-estimates';
 export function resumeProductionForecast(e: LocalExecutor) {
   const s = e.stream, p = e.streamPolicy;
   if (!s || !p) return { reason: '尚无生产观测，运行后才能估算。' };
-  const cost = streamCostEvidence(e), time = streamTimeEvidence(e), obs = s.productionObservation;
+  const cost = streamCostEvidence(e), obs = s.productionObservation;
   const plans: { label: string; base: number; low?: number; high?: number }[] = [], missing: string[] = [];
   if (p.costLimitCents !== undefined) {
     const budget = Math.max(0, p.costLimitCents-s.costCents);
     if (cost.ready) plans.push({ label: '剩余成本额度', base: Math.floor(budget/cost.base!), low: cost.high ? Math.floor(budget/cost.high) : undefined, high: cost.low ? Math.floor(budget/cost.low) : undefined });
     else missing.push('成本观测不足');
-  }
-  if (p.runtimeLimitMs !== undefined) {
-    const hours = Math.max(0, p.runtimeLimitMs-(s.activeRunMs ?? 0))/3600000;
-    if (time.ready) plans.push({ label: '剩余处理时长', base: Math.floor(hours*time.rate!), low: time.slowRate === undefined ? undefined : Math.floor(hours*time.slowRate), high: time.fastRate === undefined ? undefined : Math.floor(hours*time.fastRate) });
-    else missing.push('时间观测不足');
   }
   if (p.inputLimit !== undefined) {
     const inputs = Math.max(0, p.inputLimit-s.admitted);

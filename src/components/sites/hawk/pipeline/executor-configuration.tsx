@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert, Form, Input, InputNumber, Modal, Radio, Select, Typography } from 'antd';
+import { Alert, Form, Input, InputNumber, Modal, Radio, Select, Switch, Typography } from 'antd';
 import { BellOutlined, CheckCircleOutlined, SafetyOutlined, AimOutlined, ClockCircleOutlined, DatabaseOutlined, DollarCircleOutlined } from '@ant-design/icons';
 import { executorSettings, type ExecutorSettings } from '../data/executor-settings';
 import type { StreamPolicy } from '../data/executor-streaming';
 import type { LocalExecutor } from '../data/local-workspace';
-import { ExecutorDurationInput } from './executor-duration-input';
 import '../project/settings-dialog.css';
 import './executor-configuration.css';
 
@@ -24,13 +23,14 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
   const rule = Form.useWatch(['settings', 'filterRule'], form) ?? executorSettings(executor.settings).filterRule;
   const after = Form.useWatch(['settings', 'afterRetries'], form) ?? executorSettings(executor.settings).afterRetries;
   const runMode = Form.useWatch('runMode', form) ?? executor.runMode ?? 'batch';
+  const waitingReminderEnabled = Form.useWatch(['streamPolicy', 'waitingReminderEnabled'], form) ?? executor.streamPolicy?.waitingReminderEnabled ?? true;
   const locked = Boolean(executor.runtime?.started);
   const limitsEditable = locked && executor.runMode === 'stream' && executor.stream?.phase !== 'completed' && !executor.stream?.endedIntake;
-  return <Modal title={<div className="hawk-settings-heading"><span>输入及执行器配置</span><p>{limitsEditable ? '执行已开始，仅可修改运行限制；保存后不会自动继续。' : locked ? '执行已开始，当前配置仅供查看。' : '配置本次输入、执行方式与交付文件。'}</p></div>} open centered width={840} className="hawk-settings-modal hawk-executor-configuration" okText="保存配置" okButtonProps={{ disabled: locked && !limitsEditable }} cancelText={locked ? '关闭' : '取消'} onCancel={onCancel} onOk={async () => {
+  return <Modal title={<div className="hawk-settings-heading"><span>输入及执行器配置</span><p>{limitsEditable ? '执行已开始，可修改运行限制和等待提醒；保存后不会自动继续。' : locked ? '执行已开始，当前配置仅供查看。' : '配置本次输入、执行方式与交付文件。'}</p></div>} open centered width={840} className="hawk-settings-modal hawk-executor-configuration" okText="保存配置" okButtonProps={{ disabled: locked && !limitsEditable }} cancelText={locked ? '关闭' : '取消'} onCancel={onCancel} onOk={async () => {
     try { if (locked && !limitsEditable) return; const values = await form.validateFields(); await onSave({ ...values, count: (values.runMode ?? executor.runMode ?? 'batch') === 'batch' ? executor.inputCount ?? 1 : values.count, streamPolicy: { maxRetries: 0, ...executor.streamPolicy, ...values.streamPolicy, targetOutputMode: 'count', targetOutputPercent: undefined, legacyTargetUnresolved: undefined, costLimitAction: 'drain' }, settings: executorSettings(values.settings) }); }
     catch (issue) { if (issue instanceof Error) setError(issue.message); }
   }}>
-    <Form form={form} disabled={locked && !limitsEditable} layout="vertical" initialValues={{ deliveryMode: executor.deliveryMode ?? 'sorted', resource: executor.input ?? '', count: executor.inputCount ?? 1, resourceType: executor.resourceType ?? 'video', settings: executorSettings(executor.settings), runMode: executor.runMode ?? 'batch', streamPolicy: { idleTimeoutMs: 600000, costLimitAction: 'drain', maxRetries: 0, observationSize: 1000, ...executor.streamPolicy } }}>
+    <Form form={form} disabled={locked && !limitsEditable} layout="vertical" initialValues={{ deliveryMode: executor.deliveryMode ?? 'sorted', resource: executor.input ?? '', count: executor.inputCount ?? 1, resourceType: executor.resourceType ?? 'video', settings: executorSettings(executor.settings), runMode: executor.runMode ?? 'batch', streamPolicy: { waitingReminderEnabled: true, waitingNormalMinutes: 30, waitingUrgentMinutes: 60, costLimitAction: 'drain', maxRetries: 0, observationSize: 1000, ...executor.streamPolicy } }}>
       {summary && <Alert type="info" showIcon message="刚才的试算（仅供参考）" description={summary} />}
       {executor.streamPolicy?.legacyTargetUnresolved && <Alert type="warning" showIcon message="旧目标缺少输入基准，请重新确认成品数量后保存" />}
       {error && <Alert type="error" role="alert" showIcon message={error} />}
@@ -61,17 +61,17 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
             <div className="hawk-stream-config-heading"><DollarCircleOutlined aria-hidden="true" /><div><strong>成本控制</strong><p>费用预测只作参考；只有真实费用触顶时才按此设置处理。</p></div></div>
             <div className="hawk-executor-config-grid">
               <Form.Item name={['streamPolicy', 'costLimitCents']} label="总成本上限（选填，元）" getValueProps={value => ({ value: value === undefined ? undefined : value / 100 })} getValueFromEvent={value => value === null || value === undefined ? undefined : Math.round(value * 100)}><InputNumber disabled={locked && !limitsEditable} min={0.01} precision={2} placeholder="留空表示不设上限" style={{ width: '100%' }} /></Form.Item>
-              <Form.Item name={['streamPolicy', 'reminderRatio']} label="费用达到上限的多少时提前提醒（选填）" extra="按累计实际费用触发；提醒强度可在“通知与成本反馈”中配置。预估费用不触发停机。"><InputNumber disabled={locked} min={0.01} max={99.99} suffix="%" placeholder="例如 80；留空关闭" style={{ width: '100%' }} /></Form.Item>
             </div>
             <Typography.Paragraph className="hawk-executor-config-note">触顶后停止新增输入；在途任务继续收尾，最终费用可能超过上限。</Typography.Paragraph>
           </section>
           <section className="hawk-stream-config-group">
-            <div className="hawk-stream-config-heading"><ClockCircleOutlined aria-hidden="true" /><div><strong>累计运行时长</strong><p>按执行器累计的实际处理时间计算，并行环节同时处理只计一次。</p></div></div>
-            <Form.Item name={['streamPolicy', 'runtimeLimitMs']} label="运行时长上限（选填）" extra="暂停、排队及无数据等待时间不计入；达到上限后停止新增输入，在途任务继续收尾。"><ExecutorDurationInput disabled={locked && !limitsEditable} /></Form.Item>
-          </section>
-          <section className="hawk-stream-config-group">
-            <div className="hawk-stream-config-heading"><ClockCircleOutlined aria-hidden="true" /><div><strong>输入源等待</strong><p>当前没有数据时等待；收到数据、消息、心跳或传输进度都会重新计时。</p></div></div>
-            <Form.Item name={['streamPolicy', 'idleTimeoutMs']} label="无输入源活动等待时长（分钟）" rules={[{ required: true, message: '请设置无活动等待时长' }]} getValueProps={value => ({ value: value === undefined ? 10 : value / 60000 })} getValueFromEvent={value => value == null ? undefined : value * 60000} extra="默认10分钟。连续无活动超时后停止取数，在途收尾；源活动恢复后仍须手动继续。检查失败也暂停并标明原因。"><InputNumber disabled={locked && !limitsEditable} min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
+            <div className="hawk-stream-config-heading"><ClockCircleOutlined aria-hidden="true" /><div><strong>等待新数据提醒</strong><p>整个执行器暂无数据可处理时开始计时；提醒不会暂停运行。</p></div></div>
+            <Form.Item name={['streamPolicy', 'waitingReminderEnabled']} label="等待提醒" valuePropName="checked"><Switch disabled={locked && !limitsEditable} checkedChildren="开启" unCheckedChildren="关闭" /></Form.Item>
+            {waitingReminderEnabled && <div className="hawk-executor-config-grid">
+              <Form.Item name={['streamPolicy', 'waitingNormalMinutes']} label="普通通知（等待分钟数）" rules={[{ required: true, type: 'integer', min: 1, message: '请填写正整数分钟' }]}><InputNumber disabled={locked && !limitsEditable} min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
+              <Form.Item name={['streamPolicy', 'waitingUrgentMinutes']} label="加急通知（等待分钟数）" rules={[{ required: true, type: 'integer', min: 1, message: '请填写正整数分钟' }, ({ getFieldValue }) => ({ validator(_, value) { return value > getFieldValue(['streamPolicy', 'waitingNormalMinutes']) ? Promise.resolve() : Promise.reject(new Error('加急时间须晚于普通通知')); } })]} dependencies={[['streamPolicy', 'waitingNormalMinutes']]}><InputNumber disabled={locked && !limitsEditable} min={1} precision={0} style={{ width: '100%' }} /></Form.Item>
+            </div>}
+            <Typography.Paragraph className="hawk-executor-config-note">默认等待30分钟普通通知、60分钟加急，均从本段等待开始计算，每级各提醒一次。恢复处理或人工暂停后结束本段等待；复用现有通知体系。</Typography.Paragraph>
           </section>
 
 
@@ -97,7 +97,7 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
         </div>}
         </>}
       </section>
-      <details className="hawk-config-existing-settings"><summary>交付文件与提醒设置{locked ? '（已锁定）' : ''}</summary><section className="hawk-settings-section">
+      <details className="hawk-config-existing-settings"><summary>既有提醒设置{locked ? '（已锁定）' : ''}</summary><section className="hawk-settings-section" hidden={runMode === 'stream'}>
         <div className="hawk-settings-section-heading"><h3>交付文件</h3><p>只影响输出文件的行顺序，不改变批次或处理顺序。</p></div>
         <Form.Item name="deliveryMode" label="交付文件排序"><Radio.Group disabled={locked} aria-label="执行器交付文件排序" optionType="button" options={[{ value: 'sorted', label: '按输入顺序排序' }, { value: 'unsorted', label: '不排序，更快生成' }]} /></Form.Item>
       </section>
@@ -111,7 +111,7 @@ export function ExecutorConfiguration({ executor, summary, onCancel, onSave }: {
           </div>
         </div>
       </section>
-      </details><p className="hawk-executor-config-footnote">配置仅对本次执行器生效；资源数量及重试结果为本地模拟。</p>
+      </details><p className="hawk-executor-config-footnote">配置仅对本次执行器生效；资源数量及重试结果为本地模拟。流式不保证原始输入顺序。</p>
     </Form>
   </Modal>;
 }
